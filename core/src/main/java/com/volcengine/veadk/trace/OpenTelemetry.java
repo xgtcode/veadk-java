@@ -15,7 +15,7 @@
  */
 package com.volcengine.veadk.trace;
 
-import com.google.adk.Telemetry;
+import com.google.adk.telemetry.Tracing;
 import com.volcengine.veadk.Version;
 import com.volcengine.veadk.trace.exporter.AttributeRewritingSpanExporter;
 import com.volcengine.veadk.trace.exporter.ExporterFactory;
@@ -70,7 +70,7 @@ public class OpenTelemetry {
 
         OpenTelemetrySdk.builder().setTracerProvider(tracerProvider).buildAndRegisterGlobal();
 
-        Telemetry.setTracerForTesting(GlobalOpenTelemetry.getTracer("veadk"));
+        Tracing.setTracerForTesting(GlobalOpenTelemetry.getTracer("veadk"));
 
         Runtime.getRuntime().addShutdownHook(new Thread(tracerProvider::close));
     }

@@ -32,6 +32,12 @@ public class EnvUtil {
     private static final String AGENTKIT_TOOL_SERVICE = "AGENTKIT_TOOL_SERVICE_CODE";
     private static final String AGENTKIT_TOOL_REGION = "AGENTKIT_TOOL_REGION";
     private static final String AGENTKIT_TOOL_HOST = "AGENTKIT_TOOL_HOST";
+    private static final String REGION = "REGION";
+    private static final String MEM0_API_KEY = "DATABASE_MEM0_API_KEY";
+    private static final String MEM0_API_KEY_ID = "DATABASE_MEM0_API_KEY_ID";
+    private static final String MEM0_PROJECT_ID = "DATABASE_MEM0_PROJECT_ID";
+    private static final String MEM0_BASE_URL = "DATABASE_MEM0_BASE_URL";
+    private static final String MEM0_REGION = "DATABASE_MEM0_REGION";
 
     // default value
     private static final String DEFAULT_TLS_ENDPONT = "https://tls-cn-beijing.volces.com:4317";
@@ -39,6 +45,7 @@ public class EnvUtil {
     private static final String DEFAULT_VIKING_MEMORY_TYPE = "sys_event_v1";
     private static final String DEFAULT_AGENTKIT_SERVICE = "agentkit";
     private static final String DEFAULT_AGENTKIT_REGION = "cn-beijing";
+    private static final String DEFAULT_MEM0_BASE_URL = "https://api.mem0.ai";
 
     private EnvUtil() {}
 
@@ -90,6 +97,42 @@ public class EnvUtil {
             throw getIllegalStateException(VOLCENGINE_SECRET_KEY);
         }
         return secretKey;
+    }
+
+    public static String getRegion() {
+        String region = System.getenv(REGION);
+        if (StringUtils.isBlank(region)) {
+            return DEFAULT_AGENTKIT_REGION;
+        }
+        return region;
+    }
+
+    public static String getMem0ApiKey() {
+        return System.getenv(MEM0_API_KEY);
+    }
+
+    public static String getMem0ApiKeyId() {
+        return System.getenv(MEM0_API_KEY_ID);
+    }
+
+    public static String getMem0ProjectId() {
+        return System.getenv(MEM0_PROJECT_ID);
+    }
+
+    public static String getMem0BaseUrl() {
+        return System.getenv(MEM0_BASE_URL);
+    }
+
+    public static String getDefaultMem0BaseUrl() {
+        return DEFAULT_MEM0_BASE_URL;
+    }
+
+    public static String getMem0Region() {
+        String region = System.getenv(MEM0_REGION);
+        if (StringUtils.isBlank(region)) {
+            return getRegion();
+        }
+        return region;
     }
 
     public static String getTLSEndpoint() {

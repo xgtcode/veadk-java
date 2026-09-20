@@ -98,4 +98,47 @@ class EnvUtilTest {
     void getVikingMmemoryType_withMissingEnv_shouldReturnDefault() {
         assertThat(EnvUtil.getVikingMmemoryType()).isEqualTo("sys_event_v1");
     }
+
+    @Test
+    @SetEnvironmentVariable(key = "DATABASE_MEM0_API_KEY", value = "mem0_api_key")
+    void getMem0ApiKey() {
+        assertThat(EnvUtil.getMem0ApiKey()).isEqualTo("mem0_api_key");
+    }
+
+    @Test
+    @SetEnvironmentVariable(key = "DATABASE_MEM0_API_KEY_ID", value = "mem0_api_key_id")
+    void getMem0ApiKeyId() {
+        assertThat(EnvUtil.getMem0ApiKeyId()).isEqualTo("mem0_api_key_id");
+    }
+
+    @Test
+    @SetEnvironmentVariable(key = "DATABASE_MEM0_PROJECT_ID", value = "mem0_project_id")
+    void getMem0ProjectId() {
+        assertThat(EnvUtil.getMem0ProjectId()).isEqualTo("mem0_project_id");
+    }
+
+    @Test
+    @SetEnvironmentVariable(key = "DATABASE_MEM0_BASE_URL", value = "https://mem0.example.com")
+    void getMem0BaseUrl() {
+        assertThat(EnvUtil.getMem0BaseUrl()).isEqualTo("https://mem0.example.com");
+    }
+
+    @Test
+    @ClearEnvironmentVariable(key = "DATABASE_MEM0_BASE_URL")
+    void getDefaultMem0BaseUrl() {
+        assertThat(EnvUtil.getDefaultMem0BaseUrl()).isEqualTo("https://api.mem0.ai");
+    }
+
+    @Test
+    @SetEnvironmentVariable(key = "DATABASE_MEM0_REGION", value = "cn-shanghai")
+    void getMem0Region() {
+        assertThat(EnvUtil.getMem0Region()).isEqualTo("cn-shanghai");
+    }
+
+    @Test
+    @ClearEnvironmentVariable(key = "DATABASE_MEM0_REGION")
+    @SetEnvironmentVariable(key = "REGION", value = "cn-beijing")
+    void getMem0Region_withMissingMem0Region_shouldUseRegion() {
+        assertThat(EnvUtil.getMem0Region()).isEqualTo("cn-beijing");
+    }
 }

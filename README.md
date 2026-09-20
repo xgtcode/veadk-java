@@ -92,8 +92,24 @@ Start command:
 - If you need `web search`, `Viking Memory`, or `Viking Knowledgebase`, configure these environment variables:
   - `VOLCENGINE_ACCESS_KEY`: Volcengine AccessKey
   - `VOLCENGINE_SECRET_KEY`: Volcengine SecretKey
+- If you need `Mem0 Memory`, configure either a direct Mem0 API key:
+  - `DATABASE_MEM0_API_KEY`: Mem0 API Key
+  - `DATABASE_MEM0_BASE_URL`: Mem0 endpoint, for example `https://api.mem0.ai`
+- Or configure Volcengine credentials and a Mem0 project/API key id so VeADK can resolve the Mem0 API key:
+  - `VOLCENGINE_ACCESS_KEY`: Volcengine AccessKey
+  - `VOLCENGINE_SECRET_KEY`: Volcengine SecretKey
+  - `REGION`: Volcengine region, defaults to `cn-beijing`
+  - `DATABASE_MEM0_PROJECT_ID`: Mem0 memory project id
+  - `DATABASE_MEM0_API_KEY_ID`: optional Mem0 API key id
 - If you need TLS Trace, besides AK/SK, also configure the TLS topic:
   - `OBSERVABILITY_OPENTELEMETRY_TLS_SERVICE_NAME`: ID of the TLS service trace log topic
+
+Run the Mem0 memory example:
+
+```bash
+./mvnw -q install -DskipTests
+./mvnw -pl example -q compile exec:java -Dexec.mainClass=com.volcengine.veadk.example.Mem0MemoryAgent
+```
 
 ## Related Projects
 - Python version and documentation: [veadk-python](https://github.com/volcengine/veadk-python).

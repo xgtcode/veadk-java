@@ -61,6 +61,14 @@ limitations under the License.
             <artifactId>volc-sdk-java</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.volcengine</groupId>
+            <artifactId>volcengine-java-sdk-mem0</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>javax.annotation</groupId>
+            <artifactId>javax.annotation-api</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
         </dependency>

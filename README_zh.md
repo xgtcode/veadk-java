@@ -92,8 +92,24 @@ export MODEL_AGENT_API_KEY="<your-ark-api-key>"
 - 如果需要使用web search、viking memory、viking knowledgebase，需要配置环境变化：
   - VOLCENGINE_ACCESS_KEY：火山引擎AccessKey
   - VOLCENGINE_SECRET_KEY：火山引擎SecretKey
+- 如果需要使用 Mem0 Memory，可以直接配置 Mem0 API Key：
+  - `DATABASE_MEM0_API_KEY`：Mem0 API Key
+  - `DATABASE_MEM0_BASE_URL`：Mem0 服务地址，例如 `https://api.mem0.ai`
+- 也可以配置火山 AK/SK 和 Mem0 项目信息，由 VeADK 自动解析 Mem0 API Key：
+  - `VOLCENGINE_ACCESS_KEY`：火山引擎 AccessKey
+  - `VOLCENGINE_SECRET_KEY`：火山引擎 SecretKey
+  - `REGION`：火山引擎 Region，默认 `cn-beijing`
+  - `DATABASE_MEM0_PROJECT_ID`：Mem0 记忆项目 ID
+  - `DATABASE_MEM0_API_KEY_ID`：可选，Mem0 API Key ID
 - 如果需要使用TLS Trace，除了AK/SK，还需要配置TLS Topic
   - OBSERVABILITY_OPENTELEMETRY_TLS_SERVICE_NAME：TLS服务trace日志主题的id
+
+运行 Mem0 记忆示例：
+
+```bash
+./mvnw -q install -DskipTests
+./mvnw -pl example -q compile exec:java -Dexec.mainClass=com.volcengine.veadk.example.Mem0MemoryAgent
+```
 
 ## 相关项目
 - Python 版本与文档参考：[veadk-python](https://github.com/volcengine/veadk-python)。

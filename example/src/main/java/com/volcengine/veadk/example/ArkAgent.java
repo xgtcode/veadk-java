@@ -21,7 +21,7 @@ import com.google.adk.tools.Annotations.Schema;
 import com.google.adk.tools.FunctionTool;
 import com.google.adk.tools.LoadMemoryTool;
 import com.volcengine.veadk.agent.SaveSessionToMemoryCallback;
-import com.volcengine.veadk.knowledgebase.viking.VikingKnowledgebaseService;
+import com.volcengine.veadk.knowledgebase.KnowledgeBase;
 import com.volcengine.veadk.model.ArkLlm;
 import com.volcengine.veadk.tools.knowledgebase.LoadKnowledgebaseTool;
 import com.volcengine.veadk.tools.sandbox.RunCodeTool;
@@ -77,7 +77,7 @@ public class ArkAgent {
                         // enable web search tool
                         new WebSearchTool(),
                         // enable knowledgebase tool
-                        new LoadKnowledgebaseTool(new VikingKnowledgebaseService(appName)),
+                        new LoadKnowledgebaseTool(KnowledgeBase.viking(appName)),
                         // enable memory tool
                         new LoadMemoryTool(),
                         // enable runcode tool

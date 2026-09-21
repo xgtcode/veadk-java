@@ -13,20 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.volcengine.veadk.knowledgebase;
+package com.volcengine.veadk.knowledgebase.backends.opensearch;
 
-import com.google.common.collect.ImmutableList;
+import com.volcengine.veadk.knowledgebase.KnowledgebaseEntry;
+import dev.langchain4j.data.embedding.Embedding;
+import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
-public class SearchKnowledgebaseResponse {
+interface OpensearchVectorStore extends AutoCloseable {
 
-    private ImmutableList<KnowledgebaseEntry> knowledgebaseEntries;
+    void ensureIndex(String index, int dimensions) throws IOException;
 
-    public void setKnowledgebaseEntries(List<KnowledgebaseEntry> knowledgebaseEntries) {
-        this.knowledgebaseEntries = ImmutableList.copyOf(knowledgebaseEntries);
-    }
+    void upsert(
+            String index, String id, String text, Map<String, String> metadata, Embedding embedding)
+            throws IOException;
 
-    public ImmutableList<KnowledgebaseEntry> getKnowledgebaseEntries() {
-        return knowledgebaseEntries;
-    }
+    List<KnowledgebaseEntry> search(String index, Embedding embedding, int topK) throws IOException;
+
+    @Override
+    default void close() throws IOException {}
 }

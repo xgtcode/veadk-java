@@ -13,20 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.volcengine.veadk.knowledgebase;
+package com.volcengine.veadk.model.embedding;
 
-import com.google.common.collect.ImmutableList;
 import java.util.List;
 
-public class SearchKnowledgebaseResponse {
+public interface EmbeddingModel {
 
-    private ImmutableList<KnowledgebaseEntry> knowledgebaseEntries;
+    List<Double> embed(String text);
 
-    public void setKnowledgebaseEntries(List<KnowledgebaseEntry> knowledgebaseEntries) {
-        this.knowledgebaseEntries = ImmutableList.copyOf(knowledgebaseEntries);
+    default List<List<Double>> embedAll(List<String> texts) {
+        return texts.stream().map(this::embed).toList();
     }
 
-    public ImmutableList<KnowledgebaseEntry> getKnowledgebaseEntries() {
-        return knowledgebaseEntries;
-    }
+    int dimensions();
 }

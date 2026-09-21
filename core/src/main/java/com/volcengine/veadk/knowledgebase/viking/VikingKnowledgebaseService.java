@@ -15,41 +15,27 @@
  */
 package com.volcengine.veadk.knowledgebase.viking;
 
-import com.volcengine.veadk.integration.vikingknowledgebase.KnowledgebaseEntry;
-import com.volcengine.veadk.integration.vikingknowledgebase.VikingKnowledgebaseWrapper;
 import com.volcengine.veadk.knowledgebase.BaseKnowledgebaseService;
+import com.volcengine.veadk.knowledgebase.KnowledgeBase;
 import com.volcengine.veadk.knowledgebase.SearchKnowledgebaseResponse;
-import com.volcengine.veadk.utils.EnvUtil;
 import io.reactivex.rxjava3.core.Single;
-import java.util.List;
 
+/**
+ * @deprecated use {@link KnowledgeBase#viking(String)} or {@link KnowledgeBase#builder()} with the
+ *     {@code viking} backend.
+ */
+@Deprecated
 public class VikingKnowledgebaseService implements BaseKnowledgebaseService {
 
-    private VikingKnowledgebaseWrapper wrapper;
-    private String appName;
+    private final KnowledgeBase knowledgeBase;
 
     public VikingKnowledgebaseService(String appName) {
-        if (null != appName && !appName.matches("^[a-zA-Z][a-zA-Z0-9_]*$")) {
-            throw new IllegalArgumentException(
-                    "appName can only contain English letters, numbers, and underscores, and must"
-                            + " start with an English letter.");
-        }
-        wrapper = new VikingKnowledgebaseWrapper(EnvUtil.getAccessKey(), EnvUtil.getSecretKey());
-        this.appName = appName;
-        if (!wrapper.isCollectionExists(appName)) {
-            wrapper.createCollection(appName);
-        }
+        this.knowledgeBase =
+                KnowledgeBase.builder().backend("viking").appName(appName).topK(5).build();
     }
 
     @Override
     public Single<SearchKnowledgebaseResponse> searchKnowledgebase(String query) {
-        return Single.fromCallable(
-                () -> {
-                    List<KnowledgebaseEntry> entries =
-                            wrapper.searchKnowledge(this.appName, query, 5, null, true, 3);
-                    SearchKnowledgebaseResponse response = new SearchKnowledgebaseResponse();
-                    response.setKnowledgebaseEntries(entries);
-                    return response;
-                });
+        return knowledgeBase.searchKnowledgebase(query);
     }
 }

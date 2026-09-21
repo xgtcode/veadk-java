@@ -16,7 +16,7 @@
 package com.volcengine.veadk.tools.knowledgebase;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.volcengine.veadk.integration.vikingknowledgebase.KnowledgebaseEntry;
+import com.volcengine.veadk.knowledgebase.KnowledgebaseEntry;
 import java.util.List;
 
 public record LoadKnowledgebaseResponse(

@@ -8,8 +8,8 @@ import static org.mockito.Mockito.when;
 
 import com.google.adk.models.LlmRequest;
 import com.google.adk.tools.ToolContext;
-import com.volcengine.veadk.integration.vikingknowledgebase.KnowledgebaseEntry;
 import com.volcengine.veadk.knowledgebase.BaseKnowledgebaseService;
+import com.volcengine.veadk.knowledgebase.KnowledgebaseEntry;
 import com.volcengine.veadk.knowledgebase.SearchKnowledgebaseResponse;
 import io.reactivex.rxjava3.core.Single;
 import java.util.Collections;

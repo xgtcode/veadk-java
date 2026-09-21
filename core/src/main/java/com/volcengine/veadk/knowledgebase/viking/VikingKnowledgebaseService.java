@@ -15,9 +15,9 @@
  */
 package com.volcengine.veadk.knowledgebase.viking;
 
-import com.volcengine.veadk.integration.vikingknowledgebase.KnowledgebaseEntry;
 import com.volcengine.veadk.integration.vikingknowledgebase.VikingKnowledgebaseWrapper;
 import com.volcengine.veadk.knowledgebase.BaseKnowledgebaseService;
+import com.volcengine.veadk.knowledgebase.KnowledgebaseEntry;
 import com.volcengine.veadk.knowledgebase.SearchKnowledgebaseResponse;
 import com.volcengine.veadk.utils.EnvUtil;
 import io.reactivex.rxjava3.core.Single;
@@ -45,7 +45,7 @@ public class VikingKnowledgebaseService implements BaseKnowledgebaseService {
     public Single<SearchKnowledgebaseResponse> searchKnowledgebase(String query) {
         return Single.fromCallable(
                 () -> {
-                    List<KnowledgebaseEntry> entries =
+                    List<? extends KnowledgebaseEntry> entries =
                             wrapper.searchKnowledge(this.appName, query, 5, null, true, 3);
                     SearchKnowledgebaseResponse response = new SearchKnowledgebaseResponse();
                     response.setKnowledgebaseEntries(entries);

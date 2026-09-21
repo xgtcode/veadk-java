@@ -13,11 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.volcengine.veadk.tools.knowledgebase;
+package com.volcengine.veadk.knowledgebase.backends.opensearch;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.volcengine.veadk.knowledgebase.KnowledgebaseEntry;
+import dev.langchain4j.data.embedding.Embedding;
+import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
-public record LoadKnowledgebaseResponse(
-        @JsonProperty("knowledges") List<KnowledgebaseEntry> knowledges) {}
+interface OpensearchVectorStore extends AutoCloseable {
+
+    void ensureIndex(String index, int dimensions) throws IOException;
+
+    void upsert(
+            String index, String id, String text, Map<String, String> metadata, Embedding embedding)
+            throws IOException;
+
+    List<KnowledgebaseEntry> search(String index, Embedding embedding, int topK) throws IOException;
+
+    @Override
+    default void close() throws IOException {}
+}

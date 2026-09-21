@@ -16,14 +16,13 @@
 package com.volcengine.veadk.knowledgebase;
 
 import com.google.common.collect.ImmutableList;
-import com.volcengine.veadk.integration.vikingknowledgebase.KnowledgebaseEntry;
 import java.util.List;
 
 public class SearchKnowledgebaseResponse {
 
     private ImmutableList<KnowledgebaseEntry> knowledgebaseEntries;
 
-    public void setKnowledgebaseEntries(List<KnowledgebaseEntry> knowledgebaseEntries) {
+    public void setKnowledgebaseEntries(List<? extends KnowledgebaseEntry> knowledgebaseEntries) {
         this.knowledgebaseEntries = ImmutableList.copyOf(knowledgebaseEntries);
         ;
     }

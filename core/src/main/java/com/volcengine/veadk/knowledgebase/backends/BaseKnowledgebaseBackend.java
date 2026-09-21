@@ -13,11 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.volcengine.veadk.tools.knowledgebase;
+package com.volcengine.veadk.knowledgebase.backends;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.volcengine.veadk.knowledgebase.KnowledgebaseEntry;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 
-public record LoadKnowledgebaseResponse(
-        @JsonProperty("knowledges") List<KnowledgebaseEntry> knowledges) {}
+public interface BaseKnowledgebaseBackend extends AutoCloseable {
+
+    void precheckIndexNaming();
+
+    boolean addFromDirectory(Path directory) throws IOException;
+
+    boolean addFromFiles(List<Path> files) throws IOException;
+
+    boolean addFromText(String text) throws IOException;
+
+    boolean addFromText(List<String> text) throws IOException;
+
+    List<KnowledgebaseEntry> search(String query, int topK) throws IOException;
+
+    @Override
+    default void close() throws IOException {}
+}

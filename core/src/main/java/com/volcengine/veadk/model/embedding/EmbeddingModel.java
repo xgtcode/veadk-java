@@ -13,11 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.volcengine.veadk.tools.knowledgebase;
+package com.volcengine.veadk.model.embedding;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.volcengine.veadk.knowledgebase.KnowledgebaseEntry;
 import java.util.List;
 
-public record LoadKnowledgebaseResponse(
-        @JsonProperty("knowledges") List<KnowledgebaseEntry> knowledges) {}
+public interface EmbeddingModel {
+
+    List<Double> embed(String text);
+
+    default List<List<Double>> embedAll(List<String> texts) {
+        return texts.stream().map(this::embed).toList();
+    }
+
+    int dimensions();
+}

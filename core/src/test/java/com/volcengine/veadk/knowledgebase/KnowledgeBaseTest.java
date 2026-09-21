@@ -4,12 +4,17 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.volcengine.veadk.integration.vikingknowledgebase.VikingKnowledgebaseWrapper;
 import com.volcengine.veadk.knowledgebase.backends.BaseKnowledgebaseBackend;
+import com.volcengine.veadk.utils.EnvUtil;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedConstruction;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 class KnowledgeBaseTest {
 
@@ -60,6 +65,16 @@ class KnowledgeBaseTest {
     }
 
     @Test
+    void addDoc_delegatesToBackendInstance() throws IOException {
+        FakeBackend backend = new FakeBackend();
+        KnowledgeBase knowledgeBase = KnowledgeBase.builder().backendInstance(backend).build();
+
+        assertTrue(knowledgeBase.addDoc("tos://bucket/doc.md"));
+
+        assertEquals("tos://bucket/doc.md", backend.documentUri);
+    }
+
+    @Test
     void builderAcceptsAppNameAsIndexFallback() throws IOException {
         KnowledgeBase knowledgeBase =
                 KnowledgeBase.builder()
@@ -70,9 +85,42 @@ class KnowledgeBaseTest {
         assertTrue(knowledgeBase.search("q").size() == 1);
     }
 
+    @Test
+    void builderCreatesVikingBackend() throws IOException {
+        try (MockedStatic<EnvUtil> mockedEnv = Mockito.mockStatic(EnvUtil.class);
+                MockedConstruction<VikingKnowledgebaseWrapper> mockedCtor =
+                        Mockito.mockConstruction(
+                                VikingKnowledgebaseWrapper.class,
+                                (mock, context) -> {
+                                    Mockito.when(mock.isCollectionExists("KbApp")).thenReturn(true);
+                                    Mockito.when(
+                                                    mock.searchKnowledge(
+                                                            "KbApp", "q", 4, null, true, 3))
+                                            .thenReturn(
+                                                    List.of(
+                                                            vikingEntry(
+                                                                    "viking answer", Map.of())));
+                                })) {
+            mockedEnv.when(EnvUtil::getAccessKey).thenReturn("ak");
+            mockedEnv.when(EnvUtil::getSecretKey).thenReturn("sk");
+
+            KnowledgeBase knowledgeBase =
+                    KnowledgeBase.builder().backend("viking").appName("KbApp").topK(4).build();
+
+            assertEquals("viking answer", knowledgeBase.search("q").get(0).getContent());
+        }
+    }
+
+    private static com.volcengine.veadk.integration.vikingknowledgebase.KnowledgebaseEntry
+            vikingEntry(String content, Map<String, String> metadata) {
+        return new com.volcengine.veadk.integration.vikingknowledgebase.KnowledgebaseEntry(
+                content, metadata);
+    }
+
     private static class FakeBackend implements BaseKnowledgebaseBackend {
         private final List<String> texts = new java.util.ArrayList<>();
         private String query;
+        private String documentUri;
         private int topK;
         private boolean closed;
 
@@ -98,6 +146,12 @@ class KnowledgeBaseTest {
         @Override
         public boolean addFromText(List<String> text) {
             texts.addAll(text);
+            return true;
+        }
+
+        @Override
+        public boolean addDoc(String documentUri) {
+            this.documentUri = documentUri;
             return true;
         }
 

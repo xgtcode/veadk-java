@@ -24,16 +24,33 @@ public interface BaseKnowledgebaseBackend extends AutoCloseable {
 
     void precheckIndexNaming();
 
-    boolean addFromDirectory(Path directory) throws IOException;
+    default boolean addFromDirectory(Path directory) throws IOException {
+        throw unsupported("addFromDirectory");
+    }
 
-    boolean addFromFiles(List<Path> files) throws IOException;
+    default boolean addFromFiles(List<Path> files) throws IOException {
+        throw unsupported("addFromFiles");
+    }
 
-    boolean addFromText(String text) throws IOException;
+    default boolean addFromText(String text) throws IOException {
+        throw unsupported("addFromText");
+    }
 
-    boolean addFromText(List<String> text) throws IOException;
+    default boolean addFromText(List<String> text) throws IOException {
+        throw unsupported("addFromText");
+    }
+
+    default boolean addDoc(String documentUri) throws IOException {
+        throw unsupported("addDoc");
+    }
 
     List<KnowledgebaseEntry> search(String query, int topK) throws IOException;
 
     @Override
     default void close() throws IOException {}
+
+    private static UnsupportedOperationException unsupported(String operation) {
+        return new UnsupportedOperationException(
+                operation + " is not supported by this knowledgebase backend.");
+    }
 }

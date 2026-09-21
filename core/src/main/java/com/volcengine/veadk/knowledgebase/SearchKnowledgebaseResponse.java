@@ -22,9 +22,8 @@ public class SearchKnowledgebaseResponse {
 
     private ImmutableList<KnowledgebaseEntry> knowledgebaseEntries;
 
-    public void setKnowledgebaseEntries(List<? extends KnowledgebaseEntry> knowledgebaseEntries) {
+    public void setKnowledgebaseEntries(List<KnowledgebaseEntry> knowledgebaseEntries) {
         this.knowledgebaseEntries = ImmutableList.copyOf(knowledgebaseEntries);
-        ;
     }
 
     public ImmutableList<KnowledgebaseEntry> getKnowledgebaseEntries() {

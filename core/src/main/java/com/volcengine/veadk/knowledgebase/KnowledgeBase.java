@@ -17,6 +17,7 @@ package com.volcengine.veadk.knowledgebase;
 
 import com.volcengine.veadk.knowledgebase.backends.BaseKnowledgebaseBackend;
 import com.volcengine.veadk.knowledgebase.backends.opensearch.OpensearchKnowledgebaseBackend;
+import com.volcengine.veadk.knowledgebase.backends.viking.VikingKnowledgebaseBackend;
 import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Single;
 import java.io.IOException;
@@ -42,6 +43,10 @@ public class KnowledgeBase implements BaseKnowledgebaseService, AutoCloseable {
         return builder().backend("opensearch").index(index).build();
     }
 
+    public static KnowledgeBase viking(String appName) {
+        return builder().backend("viking").appName(appName).build();
+    }
+
     public boolean addFromDirectory(String directory) throws IOException {
         return backend.addFromDirectory(Path.of(directory));
     }
@@ -56,6 +61,10 @@ public class KnowledgeBase implements BaseKnowledgebaseService, AutoCloseable {
 
     public boolean addFromText(List<String> text) throws IOException {
         return backend.addFromText(text);
+    }
+
+    public boolean addDoc(String documentUri) throws IOException {
+        return backend.addDoc(documentUri);
     }
 
     public List<KnowledgebaseEntry> search(String query) throws IOException {
@@ -76,6 +85,10 @@ public class KnowledgeBase implements BaseKnowledgebaseService, AutoCloseable {
 
     public Completable addFromTextAsync(List<String> text) {
         return Completable.fromAction(() -> addFromText(text));
+    }
+
+    public Completable addDocAsync(String documentUri) {
+        return Completable.fromAction(() -> addDoc(documentUri));
     }
 
     public Single<List<KnowledgebaseEntry>> searchAsync(String query) {
@@ -147,6 +160,9 @@ public class KnowledgeBase implements BaseKnowledgebaseService, AutoCloseable {
             }
             if ("opensearch".equalsIgnoreCase(backend)) {
                 return new OpensearchKnowledgebaseBackend(resolvedIndex);
+            }
+            if ("viking".equalsIgnoreCase(backend)) {
+                return new VikingKnowledgebaseBackend(resolvedIndex);
             }
             throw new IllegalArgumentException("Unsupported knowledgebase backend: " + backend);
         }

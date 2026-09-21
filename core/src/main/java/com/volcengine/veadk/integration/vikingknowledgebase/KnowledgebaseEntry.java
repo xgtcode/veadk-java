@@ -17,14 +17,39 @@ package com.volcengine.veadk.integration.vikingknowledgebase;
 
 import java.util.Map;
 
-/**
- * @deprecated use {@link com.volcengine.veadk.knowledgebase.KnowledgebaseEntry}. This class is
- *     kept for source compatibility with earlier Viking-only APIs.
- */
-@Deprecated
-public class KnowledgebaseEntry extends com.volcengine.veadk.knowledgebase.KnowledgebaseEntry {
+public class KnowledgebaseEntry {
+    private String content;
+    private Map<String, String> metadata;
 
     public KnowledgebaseEntry(String content, Map<String, String> metadata) {
-        super(content, metadata);
+        this.content = content;
+        this.metadata = metadata;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
+
+    public Map<String, String> getMetadata() {
+        return metadata;
+    }
+
+    public void setMetadata(Map<String, String> metadata) {
+        this.metadata = metadata;
+    }
+
+    @Override
+    public String toString() {
+        return "KnowledgebaseEntry{"
+                + "content='"
+                + content
+                + '\''
+                + ", metadata="
+                + metadata
+                + '}';
     }
 }

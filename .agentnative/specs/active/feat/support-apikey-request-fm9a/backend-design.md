@@ -65,16 +65,17 @@ updated_at: "2026-09-29"
 | F-07 | `core/src/main/java/com/volcengine/veadk/knowledgebase/viking/VikingKnowledgebaseService.java` | 修改 | deprecated 兼容类增加 API Key 构造重载，保留原构造器 | REQ-001、REQ-003、REQ-005 |
 | F-08 | `core/src/main/java/com/volcengine/veadk/integration/vikingmemory/VikingMemoryWrapper.java` | 修改 | Memory 添加/查询按 API Key/AK-SK 路由；collection 管理只走 AK/SK | REQ-002、REQ-004、REQ-006 |
 | F-09 | `core/src/main/java/com/volcengine/veadk/memory/viking/VikingMemoryService.java` | 修改 | 增加 API Key 构造重载、解析优先级并跳过 API Key-only 管理预检查 | REQ-002、REQ-003、REQ-004、REQ-005 |
-| F-10 | `core/src/test/java/com/volcengine/veadk/utils/EnvUtilTest.java` | 修改 | API Key 环境读取、清洗、显式优先和领域隔离 | REQ-003、REQ-005、NFR-005 |
-| F-11 | `core/src/test/java/com/volcengine/veadk/integration/viking/VikingApiKeyHttpClientTest.java` | 新增 | 捕获并断言 URI、header、body、超时、状态码和单次发送 | REQ-001、REQ-002、REQ-006、NFR-002～NFR-004 |
-| F-12 | `core/src/test/java/com/volcengine/veadk/integration/vikingknowledgebase/VikingKnowledgebaseWrapperTest.java` | 修改 | API Key 查询映射、AK/SK fallback、非成功与 IO 语义、不降级 | REQ-001、REQ-004、REQ-006 |
+| F-10 | `core/src/test/java/com/volcengine/veadk/utils/EnvUtilTest.java` | 修改 | API Key 环境读取、清洗、显式优先、领域隔离和配置输出安全 | REQ-003、REQ-005、REQ-006、NFR-002、NFR-005 |
+| F-11 | `core/src/test/java/com/volcengine/veadk/integration/viking/VikingApiKeyHttpClientTest.java` | 新增 | 捕获并断言 URI、header、body、超时、状态码、单次发送及成功/失败输出安全 | REQ-001、REQ-002、REQ-006、NFR-002～NFR-004 |
+| F-12 | `core/src/test/java/com/volcengine/veadk/integration/vikingknowledgebase/VikingKnowledgebaseWrapperTest.java` | 修改 | API Key 查询映射、AK/SK fallback、成功/失败输出安全、非成功与 IO 语义、不降级 | REQ-001、REQ-004、REQ-006、NFR-002 |
 | F-13 | `core/src/test/java/com/volcengine/veadk/knowledgebase/backends/viking/VikingKnowledgebaseBackendTest.java` | 修改 | API Key-only 跳过管理、双凭据管理、空查询、`addDoc` 边界 | REQ-001、REQ-004、REQ-005 |
 | F-14 | `core/src/test/java/com/volcengine/veadk/knowledgebase/KnowledgeBaseTest.java` | 修改 | builder/shortcut 显式入口、环境回退及已有 backend 行为 | REQ-001、REQ-003、REQ-005 |
 | F-15 | `core/src/test/java/com/volcengine/veadk/knowledgebase/viking/VikingKnowledgebaseServiceTest.java` | 修改 | deprecated 新旧构造入口兼容 | REQ-001、REQ-005 |
-| F-16 | `core/src/test/java/com/volcengine/veadk/integration/vikingmemory/VikingMemoryWrapperTest.java` | 修改 | API Key 添加/查询、返回映射、非成功与 IO 语义、不降级 | REQ-002、REQ-004、REQ-006 |
-| F-17 | `core/src/test/java/com/volcengine/veadk/memory/viking/VikingMemoryServiceTest.java` | 修改 | 显式/环境/API Key-only/双凭据、空会话与既有返回语义 | REQ-002～REQ-005 |
+| F-16 | `core/src/test/java/com/volcengine/veadk/integration/vikingmemory/VikingMemoryWrapperTest.java` | 修改 | API Key 添加/查询、返回映射、成功/失败输出安全、非成功与 IO 语义、不降级 | REQ-002、REQ-004、REQ-006、NFR-002 |
+| F-17 | `core/src/test/java/com/volcengine/veadk/memory/viking/VikingMemoryServiceTest.java` | 修改 | 显式/环境/API Key-only/双凭据、空会话、既有返回语义和对象输出安全 | REQ-002～REQ-006、NFR-002 |
 | F-18 | `README.md` | 修改 | 英文配置和使用边界 | Spec §7、REQ-006 |
 | F-19 | `README_zh.md` | 修改 | 中文配置和使用边界 | Spec §7、REQ-006 |
+| F-20 | `core/src/test/java/com/volcengine/veadk/knowledgebase/backends/viking/VikingKnowledgebaseConfigTest.java` | 新增 | 配置对象 `toString`/Jackson 序列化与序列化失败输出安全 | REQ-006.1、REQ-006.4、NFR-002 |
 
 不修改 `pom.xml`、生成物或业务范围外文件；如果实现中发现必须新增依赖或改变服务端字段，应停止并回到设计节点处理范围变化。
 
@@ -108,7 +109,14 @@ if (apiKey == null && !hasAkSk) {
 
 `EnvUtil.getAccessKey()` 与 `getSecretKey()` 的既有抛错行为保持不变，新增 optional getter 只供 Viking 多凭据解析，避免影响其他组件。错误只列配置名与操作，不拼接配置值。
 
-## 3.2 数据库变更
+## 3.2 凭据对象的输出不变量
+
+- `VikingKnowledgebaseConfig` 的 `accessKey`、`secretKey`、`apiKey` 均为仅供内部鉴权使用的私有值；公开 getter 使用 Jackson 忽略标记（或保持非 Bean 可见）以确保 `JSONUtil.toJson(...)` 不输出三类凭据。不得为这些字段生成包含值的 `toString`。
+- `VikingMemoryService`、两个 Viking wrapper 与 `VikingApiKeyHttpClient` 不对外暴露 Secret getter，且不得实现会展开 credential、header 或 request 的 `toString`。共享 response 只保存 status/body，不保存 `Authorization`；其 `toString` 和序列化不得形成凭据旁路。
+- 对上述持有或可达凭据的相关对象，测试必须实际调用 `toString` 和仓库现有 Jackson 入口 `JSONUtil.toJson`。允许对象按设计不可序列化，但必须断言序列化失败日志/异常同样不含 Secret；不得因不可序列化而跳过检查。
+- 正常请求对象中的 `Authorization: Bearer <apiKey>` 是协议必需内容，只能由 fake transport 在内存中捕获并做正向路由断言；它不得进入日志、异常 message、JUnit/Surefire 输出、配置快照、`toString` 或序列化结果。
+
+## 3.3 数据库变更
 
 无。不存在 DDL、DML、兼容顺序、数据恢复、回填或 GORM/代码生成，因此不调用 `db-migration`。
 
@@ -240,7 +248,7 @@ if (apiKey == null && !hasAkSk) {
 | API Key-only 仍触发 collection 管理 | 构造即失败，违背数据面 key 权限边界 | 以完整 AK/SK 判定保护预检查；构造测试断言管理调用次数为 0 |
 | 双凭据路由错误 | 管理面误用 API Key或数据面未按优先级用显式 key | 捕获请求 header，并分别验证管理 `json` 与数据面 transport 的调用 |
 | 鉴权失败后 fallback | Memory 重复写或权限被意外放大 | 每次数据面只选择一个 client；失败测试断言各 transport 调用次数 |
-| 日志或异常泄露 Secret | 凭据泄露 | transport 不记录 header/body；日志使用固定模板和最小上下文；唯一假 Secret 覆盖失败与中断路径 |
+| 日志、异常或对象输出泄露 Secret | 凭据泄露 | transport 不记录 header/body；日志使用固定模板和最小上下文；唯一假 Secret 覆盖成功/失败路径，并检查日志、异常、测试输出、`toString` 与序列化 |
 | API Key HTTP 响应与现有 SDK `RawResponse` 差异 | 返回结构或空结果语义回归 | wrapper 复用现有 JSON 映射逻辑，建立同一 fixture 的 AK/SK 与 API Key 对照测试 |
 | 新公开重载破坏兼容 | 已有应用编译或行为变化 | 不删除/改签名；旧入口编译测试；不改变返回类型和默认 `topK` |
 | HTTP 阻塞调用占用 RxJava 调用线程 | 高并发时延迟积累 | 与当前同步 wrapper 行为一致，5 秒请求上限；本期不引入异步 client 或线程池 |
@@ -262,7 +270,7 @@ if (apiKey == null && !hasAkSk) {
 | T-009 | Memory API Key 查询 | 捕获 `/api/memory/search`、Bearer、filter/event types；覆盖 HTTP 与业务 envelope 错误，映射与空结果保持且失败不降级 | REQ-002.2、REQ-002.3、REQ-002.5、REQ-002.6 |
 | T-010 | Memory 管理与空会话 | API Key-only 构造管理调用 0 次；双凭据管理用 AK/SK；无有效用户消息时数据面调用 0 次 | REQ-002.4、REQ-004.1、REQ-004.2 |
 | T-011 | 缺失凭据 | 无有效 API Key 且 AK/SK 缺失或不完整，在网络调用前报错，只含配置名 | REQ-003.6、REQ-004.5、REQ-006.2 |
-| T-012 | Secret 不泄露 | 使用唯一假 key 触发非成功、IO 和中断；断言异常/可捕获日志不含 key、AK、SK、完整 Authorization 或请求体 | REQ-006.1～REQ-006.4、NFR-002 |
+| T-012 | Secret 不泄露（成功与失败） | 使用三个互不相同、可精确检索且仅用于测试的固定假标记（分别代表 API Key、AK、SK）：成功组覆盖 Knowledge API Key 查询、Memory API Key 添加/查询，以及 AK/SK collection 管理、Knowledge 查询、Memory 添加/查询；失败组覆盖 HTTP/业务失败、畸形 JSON、IOException、InterruptedException 与缺失配置。fake transport 仅在内存请求对象中正向断言完整 Bearer，随后统一断言可捕获日志、异常 message、JUnit 捕获的 stdout/stderr 与 Surefire 报告均不含三个假凭据或 `Authorization: Bearer <假 API Key>`。对 `VikingKnowledgebaseConfig`、`VikingMemoryService`、两个 wrapper、共享 client/response 等实际持有或可达凭据的对象逐一执行 `toString` 和 `JSONUtil.toJson`，输出或序列化失败异常同样执行上述否定断言，不允许以不可序列化为理由跳过；泄漏 helper 的失败信息只报告输出面名称，不回显被检查文本或 Secret | REQ-006.1、REQ-006.3、REQ-006.4、NFR-002 |
 | T-013 | HTTP transport 契约 | fake transport 断言 endpoint/path、JSON headers、Bearer、5 秒超时、状态透传、线程中断恢复 | REQ-001、REQ-002、NFR-004、NFR-006 |
 | T-014 | AK/SK 全回归 | 无 API Key 时运行原 wrapper/service 测试，管理、查询、添加、同步/异步返回不变 | REQ-005、NFR-001 |
 | T-015 | README 安全与边界 | 示例仅使用占位符；明确优先级、两环境变量、数据/管理面和已有 collection 前提 | Spec §7、REQ-006.1 |
@@ -295,7 +303,8 @@ JaCoCo 报告使用仓库现有 `jacoco-maven-plugin`，路径为 `core/target/s
 | REQ-003 | §3.1、§4.1、§9 | Task 1、4、5 | T-001、T-002、T-007、T-011 |
 | REQ-004 | §4.3、§4.4、§5 | Task 3～5 | T-005、T-010、T-011 |
 | REQ-005 / NFR-001 | §4.1、§6 | Task 4、5、7 | T-003、T-006、T-009、T-014 |
-| REQ-006 / NFR-002 | §4.2、§5、§11 | Task 2、3、6 | T-004、T-011～T-013、T-015 |
+| REQ-006.1 / REQ-006.4 / NFR-002 | §3.2、§4.2、§5、§11 | Task 2.3、3.4、6.1～6.3、7.4、8.2 | T-012、T-015 |
+| REQ-006.2 / REQ-006.3 | §3.1、§3.2、§4.2、§5 | Task 1.3、2.3、3.3～3.4、6.1～6.3 | T-004、T-008、T-009、T-011～T-013 |
 | NFR-003 | §1 ADR-003、§4.2 | Task 2、3 | T-001、T-005、T-007～T-010 |
 | NFR-004 | §4.2、§5 | Task 2、3、6 | T-003、T-004、T-008～T-010、T-013 |
 | NFR-005 | §3.1、§12.1 | Task 1、6 | T-001～T-014 |

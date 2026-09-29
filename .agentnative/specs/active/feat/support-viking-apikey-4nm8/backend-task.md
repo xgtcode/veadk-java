@@ -7,6 +7,7 @@
 - 不修改 `pom.xml`，不新增依赖，不扩展 BytePlus，不重构其他 backend，不修改数据库/OpenAPI/部署。
 - 新增或修改的每一行代码都需能映射到 REQ-001～REQ-006 或必要验证。
 - API Key、AK/SK、Authorization 不得进入日志、异常、测试失败输出、快照或文档实值。
+- Memory AddSession 的 `session_id` 只能来自 ADK `Session.id()`；不得在 service、wrapper 或重试路径生成替代 ID。
 - 开发完成后执行真实格式化检查、编译、定向测试、全量 `core` 测试和 JaCoCo 增量覆盖率统计；增量覆盖率必须达到 90% 以上。
 
 ## 2. 任务列表
@@ -71,9 +72,10 @@
   1. 保留单参数构造；新增 `(appName, apiKey)` 和 `(appName, apiKey, projectName)`。
   2. 应用显式 API Key > Memory 环境变量 > AK/SK 的选择，并将冻结配置传给 wrapper。
   3. API key-only 跳过 collection 预检查；双凭证与 AK/SK-only 保持管理预检查。
-  4. 保持 appName 校验、message 过滤、metadata、memory type、topK 与 Rx 返回语义。
-  5. 不捕获后吞掉 API Key 数据面异常，不记录异常对象。
-- 验收：T-005 覆盖三种构造、四种鉴权状态、无消息分支和异常传播。
+  4. 保持 appName 校验、message 过滤、metadata、memory type、topK 与 Rx 返回语义；过滤后存在消息时读取 `session.id()` 并作为新增参数传给 wrapper。
+  5. 无消息时仍不读取/校验 `session.id()`、不调用 wrapper；有消息时确保 `Session.id()` 来源透传，禁止用 appName/userId/UUID 替代。
+  6. 不捕获后吞掉 API Key 数据面异常或非法 ID 异常；`IllegalArgumentException` 保持原类型经 `Completable` 传播，不记录异常对象。
+- 验收：T-005 覆盖三种构造、四种鉴权状态、`Session.id()` 来源透传、无消息不校验 ID、空白/非法 ID 经 Rx 传播且不发请求，以及其他异常传播。
 
 ### TASK-005：实现 Viking Memory Bearer 添加/检索
 
@@ -86,11 +88,12 @@
 - 实现：
   1. 保留两参数 wrapper 构造，新增 apiKey/projectName 完整构造。
   2. API Key `AddSession` / `SearchMemory` 复用现有 HttpClient，发送到固定 HTTPS path，Bearer header，5 秒 connect/socket timeout。
-  3. body 保留现有字段并增加 `project_name`；不改变 messages、metadata、filter、memory type 或 limit。
-  4. 成功仍返回 boolean / `MemoryEntry` 列表；合法空结果为空列表。
-  5. 服务/网络/解析失败抛分类异常，不返回 `false`/空列表、不重试、不降级、不泄密。
-  6. AK/SK add/search 继续使用现有签名链。
-- 验收：T-006 覆盖两条 path、body/header/timeout、成功/空结果、所有失败类别、无重试/降级和泄密反例。
+  3. 将 AddSession 主签名改为 `addSession(String collectionName, String sessionId, List<Message> messages, Metadata metadata)`；在鉴权分支前将 `sessionId` trim，并按 `^[A-Za-z][A-Za-z0-9_]{0,127}$` 校验。null、空白、超长、非字母开头或非法字符均抛不含原值的 `IllegalArgumentException`，且不执行 HTTP。
+  4. AddSession body 必须包含规范化后的 `session_id`、`collection_name`、`project_name`、`messages`、`metadata`；SearchMemory body 保持既有字段并增加 `project_name`。
+  5. 成功仍返回 boolean / `MemoryEntry` 列表；合法空结果为空列表。
+  6. 服务/网络/解析失败抛分类异常，不返回 `false`/空列表、不自动重试、不降级、不泄密；同一 `sessionId` 的显式重放必须发送相同规范值，不生成新 ID。
+  7. AK/SK add/search 继续使用现有签名链；AddSession 同样携带已校验的 `session_id`，避免两种鉴权的业务身份分叉。
+- 验收：T-006 覆盖两条 path、body/header/timeout、`session_id` 全部合法/非法边界、相同 ID 重放每次单发且 body 稳定、成功/空结果、所有失败类别、无自动重试/降级和泄密反例。
 
 ### TASK-006：完成跨路径兼容与安全回归
 
@@ -101,8 +104,11 @@
   1. API Key-only、API Key+AK/SK、AK/SK-only、无凭证。
   2. Knowledgebase/Memory Key 隔离；无效显式值回退对应环境；已选择 Key 服务失败不降级。
   3. 并发调用不修改静态 header；每请求 Authorization 与 body 独立。
-  4. 假 Secret 不出现在异常 message/cause、捕获日志或测试快照。
-  5. addDoc 与 collection 管理永不走 Bearer。
+  4. 同一 ADK Session 重放时 wrapper 捕获到相同规范化 `session_id`；同一 ID 的并发写入不声明本地顺序或 no-op 幂等，调用方需串行；不同 ID 的并发请求互不串 body。
+  5. 模拟 AddSession 网络失败，断言 SDK 只发送一次；调用方显式重试时仍发送原 ID，并在测试命名/断言中标明服务端覆盖语义。
+  6. null、纯空白、长度大于 128、数字/下划线开头、含连字符/内部空格/非 ASCII 字符的 ID 均在 HTTP 前拒绝；仅有首尾空白的合法 ID trim 后通过，首字母加最多 127 个合法字符通过。
+  7. 假 API Key、AK/SK、Authorization 不出现在异常 message/cause、捕获日志或测试快照；非法 session ID 原值也不回显。
+  8. addDoc 与 collection 管理永不走 Bearer。
 - 验收：相关定向测试和 `core` 全量测试通过；无无关源文件修改。
 
 ### TASK-007：更新中英文用户文档
@@ -115,7 +121,8 @@
   2. `DATABASE_VIKINGMEM_API_KEY` 只用于已有 Memory collection 添加与检索。
   3. 展示两个显式 Java 入口；说明有效显式参数优先、无效显式值回退环境变量。
   4. 说明 API key-only 跳过管理预检查、管理和 Knowledgebase `addDoc` 仍需 AK/SK。
-  5. 使用 `<YOUR_VIKING_API_KEY>` 占位值，不出现可用 Secret。
+  5. 说明 Memory AddSession 使用 ADK `Session.id()`，要求 `[A-Za-z][A-Za-z0-9_]{0,127}`；相同 ID 重放会覆盖此前事件版本，SDK 不自动重试，同一 Session 写入应串行。
+  6. 使用 `<YOUR_VIKING_API_KEY>` 占位值，不出现可用 Secret。
 - 验收：T-007，中英文配置名、范围和示例一致。
 
 ### TASK-008：执行验证与增量覆盖率门禁
@@ -154,6 +161,8 @@ TASK-001
 - [ ] 显式 > 对应环境变量 > AK/SK 的状态机和 `none`/`null` 规则均有测试。
 - [ ] API key-only 跳过预检查；双凭证管理走 AK/SK、数据面走 API Key。
 - [ ] API Key 只发往固定 HTTPS Volcengine Viking host。
+- [ ] AddSession 从 `Session.id()` 取得稳定 ID，trim/格式校验后写入 `session_id`；非法值不发请求。
+- [ ] 同一 Session 重放复用同一 ID，SDK 无自动重试；覆盖语义和同 ID 串行边界有测试与文档。
 - [ ] 服务失败不降级，空结果与失败可区分。
 - [ ] 无 Secret 出现在日志、异常、测试输出或文档。
 - [ ] 不新增依赖、数据库、OpenAPI、Feature Gate、重试或 BytePlus 行为。

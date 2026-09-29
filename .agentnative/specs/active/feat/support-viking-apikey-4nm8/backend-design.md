@@ -7,7 +7,8 @@
 - 最新业务输入：`artifacts/workflow-node-artifact-yew395ryf4jxj0wbalkd/prd-spec.md`，对应仓库文件 `.agentnative/specs/active/feat/support-viking-apikey-4nm8/prd-spec.md`。
 - Gate：`artifacts/workflow-node-artifact-yew4l9aq68rv0yt4f9x9/result.yaml`，结论为 `PASS / NONE`，Human 已批准。
 - 需求澄清：`artifacts/workflow-node-artifact-yew36x8q9srv0yt4fg5e/viking-apikey-requirement-clarification-v2.md`。
-- 返修输入：`artifacts/workflow-node-artifact-yew4qbsc8wrv0yt4ftbo/result.yaml`，P1 finding `DESIGN-REV-001` 要求补齐 Memory AddSession 的 `session_id` 来源、规范化、透传、重放/重试语义和测试断言。
+- 第一轮返修输入：`artifacts/workflow-node-artifact-yew4qbsc8wrv0yt4ftbo/result.yaml`，P1 finding `DESIGN-REV-001` 要求补齐 Memory AddSession 的 `session_id` 来源、规范化、透传、重放/重试语义和测试断言。
+- 第二轮返修输入：`artifacts/workflow-node-artifact-yew4umoutcrv0yt4ficp/result.yaml`，P1 finding `DESIGN-REV-002` 指出上述新契约不得扩散到既有 AK/SK AddSession；API Key 路径应使用新四参数 overload，AK/SK-only 路径必须保留旧三参数签名、请求体与输入行为。
 - Python 行为基线：`volcengine/veadk-python@31d2c67be6fb9bd7f3139de42d2615c2c4a73e6f`；Memory API Key 传输语义另以其锁定依赖 `vikingdb-python-sdk==0.1.32` 的 `APIKey`、`VikingMem` 实现核验。
 - 当前 Java 仓同步基线：`5d99ab3a620709fd0863154b4602239ffada0be3`，原设计提交已在该基线上 rebase；Java 17、Maven 多模块，目标实现均在 `core`。
 - 仓库未提供 `.agentnative/templates/default/design.md` 或 `task.md`，本文按 `tech-design` 所要求的等价语义结构编写；仓库也未发现额外 `AGENTS.md`、`CLAUDE.md`、`CODEX.md` 或测试目录规范。
@@ -21,7 +22,7 @@
 - 在 Java 公共入口提供 Knowledgebase 与 Memory 各自的显式 API Key 参数。
 - 解析 `DATABASE_VIKING_API_KEY`、`DATABASE_VIKINGMEM_API_KEY`，并保持现有 `VOLCENGINE_ACCESS_KEY`、`VOLCENGINE_SECRET_KEY` 兼容。
 - 为三条数据面请求选择 Bearer API Key 或现有 AK/SK 签名链。
-- 将 ADK `Session.id()` 作为 Viking Memory AddSession 的稳定业务会话标识，按服务约束校验后透传。
+- 在实际选中 API Key 的 Viking Memory AddSession 路径，将 ADK `Session.id()` 作为稳定业务会话标识，按服务约束校验后透传；AK/SK-only 路径不读取该字段。
 - 保持返回类型、查询参数、消息筛选、memory type、topK、rerank 和 chunk diffusion 语义。
 - 补齐安全失败传播、单元测试、中英文 README。
 
@@ -40,7 +41,7 @@
 | `VikingKnowledgebaseBackend` 与 `VikingMemoryService` 构造时无条件检查/创建 collection | 只有存在一对 AK/SK 时执行管理预检查；API key-only 跳过 |
 | 两个 wrapper 继承 `volc-sdk-java:1.0.250` 的 `BaseServiceImpl` | AK/SK 继续复用该签名链；API Key 不能走 `json()`，因为 `makeRequest()` 会用 SignerV4 覆盖 `Authorization` |
 | 当前依赖没有 Java 版 `VikingMem` / `APIKey` | API Key 数据面复用 `BaseServiceImpl#getHttpClient()` 和既有 Apache HttpClient 类型，不新增依赖 |
-| 当前 `VikingMemoryService` 未向 wrapper 传递 `Session.id()`，`AddSession` body 也缺少 `session_id` | 新 wrapper 签名显式接收 `sessionId`；从 ADK `Session.id()` 获取，规范化、校验并写入请求体 |
+| 当前 `VikingMemoryService` 未向 wrapper 传递 `Session.id()`，`AddSession` body 也缺少 `session_id` | 仅为 API Key 新增显式接收 `sessionId` 的四参数 overload；保留 AK/SK 三参数方法及原请求体 |
 | wrapper 将部分失败转换为 `false` / 空列表 | API Key 路径必须传播有类别的异常；合法空 `result_list` 才返回空列表 |
 | `ServiceInfo` 当前未显式声明 scheme | API Key 仅向固定 Volcengine host 通过 HTTPS 发送，禁止明文 HTTP |
 
@@ -48,11 +49,20 @@
 
 | Review 关闭条件 | 本次设计落点 | 状态 |
 | --- | --- | --- |
-| 明确 `session_id` 来源及空白/非法值规则 | §4.3 固定为 ADK `Session.id()`，定义 trim、正则、长度与前置失败 | 已处理，待独立 Review |
-| 加入 wrapper 方法签名和 AddSession body | §5.3 定义四参数签名和包含 `session_id` 的请求体 | 已处理，待独立 Review |
-| 定义重放、重试与幂等边界 | §5.1、§6、§8 明确单发、结果未知、相同 ID 覆盖及同 Session 串行 | 已处理，待独立 Review |
-| 增加来源透传、请求字段、非法 ID 测试 | §10.1 T-005/T-006 与 TASK-004～TASK-006 | 已处理，待独立 Review |
-| 增加 Secret 不泄露断言 | §7.2、§10.1 T-006 与 TASK-006 | 已处理，待独立 Review |
+| 明确 `session_id` 来源及空白/非法值规则 | §4.3 固定为 API Key AddSession 的 ADK `Session.id()`，定义 trim、正则、长度与前置失败 | 已由 attempt 2 独立 Review 关闭 |
+| 加入 wrapper 方法签名和 AddSession body | §5.3 定义 API Key 四参数 overload 和包含 `session_id` 的请求体 | 已由 attempt 2 独立 Review 关闭 |
+| 定义重放、重试与幂等边界 | §5.1、§6、§8 明确 API Key AddSession 的单发、结果未知、相同 ID 覆盖及同 Session 串行 | 已由 attempt 2 独立 Review 关闭 |
+| 增加来源透传、请求字段、非法 ID 测试 | §10.1 T-005/T-006 与 TASK-004～TASK-006 | 已由 attempt 2 独立 Review 关闭 |
+| 增加 Secret 不泄露断言 | §7.2、§10.1 T-006 与 TASK-006 | 已由 attempt 2 独立 Review 关闭 |
+
+### 1.5 DESIGN-REV-002 返修闭环
+
+| Review 关闭条件 | 本次设计落点 | 状态 |
+| --- | --- | --- |
+| `Session.id()` 强制读取与校验仅限实际选中 API Key 的 AddSession | §4.3、§5.3、§5.4 在鉴权选择后分支；API Key 才读取、规范化和校验 | 已处理，待独立 Review |
+| `session_id` 请求字段仅限 API Key AddSession | §5.3 分列 API Key 五字段 body 与 AK/SK 原三字段 body | 已处理，待独立 Review |
+| AK/SK-only 继续接受旧输入并保持调用与请求行为 | §5.3、§7.1 保留三参数 `addSession`、不读取 `Session.id()`、继续 `json()`/SignerV4 | 已处理，待独立 Review |
+| 补充兼容测试 | §10.1 T-005/T-006 与 TASK-004～TASK-006 覆盖 null/空白/非法/抛错 ID 的 AK/SK 旧路径和精确 body | 已处理，待独立 Review |
 
 ## 2. 目标与非目标
 
@@ -62,14 +72,15 @@
 2. Memory 可用 API Key 执行 `addSessionToMemory` 与 `searchMemory`，并保留 ADK 的异步接口和结果类型。
 3. 配置选择确定且实例隔离：有效显式参数 > 对应环境变量 > 一对有效 AK/SK。
 4. 双凭证下数据面只用 API Key、管理面只用 AK/SK；API Key 服务端失败不降级。
-5. 所有失败可区分且不泄露 API Key、AK/SK 或 Authorization。
-6. Memory AddSession 使用稳定、合法的 ADK `Session.id()`；同一 Session 重放复用同一 `session_id`，不因重试生成新 ID。
+5. API Key 路径的失败可区分，所有路径均不泄露 API Key、AK/SK 或 Authorization。
+6. 实际选中 API Key 的 Memory AddSession 使用稳定、合法的 ADK `Session.id()`；同一 Session 重放复用同一 `session_id`，不因重试生成新 ID。
 
 ### 2.2 非目标
 
 - 不改变本次三条数据面以外的请求、业务模型或排序。
 - 不新增自动重试、连接池实现、依赖或后台任务。
 - 不补做既有 AK/SK 路径的全量错误模型重构。
+- 不为既有 AK/SK AddSession 增加 `Session.id()` 前置条件、`session_id` / `project_name` 字段或新的重放语义。
 - 不引入 Feature Gate；SDK 版本回退即为代码回滚手段。
 
 ## 3. 影响面
@@ -161,7 +172,7 @@ resolveApiKey(explicit, envName):
 
 不增加新的 Memory builder/config 类型，避免仅为三个值引入额外抽象。现有 `appName` 校验、message 筛选、metadata、memory type 与 `topK=5` 不变。
 
-AddSession 的 `session_id` 规则固定如下：
+以下 AddSession `session_id` 规则只在当前实例实际选中 API Key 时适用；AK/SK-only 不进入该规则：
 
 ```text
 normalizeSessionId(value):
@@ -173,10 +184,11 @@ normalizeSessionId(value):
   return normalized
 ```
 
-- 唯一来源是传入 `addSessionToMemory` 的 ADK `Session.id()`；不读取环境变量、不使用 `appName`/`userId` 拼接，也不在空值或非法值时生成 UUID，避免同一 Session 重放改变业务身份。
-- `messages` 过滤结果为空时沿用原行为，不读取/校验 `session.id()`、不发请求并正常完成；存在待写消息时，在任何鉴权或 HTTP 调用前执行上述校验。
+- API Key AddSession 的唯一来源是传入 `addSessionToMemory` 的 ADK `Session.id()`；不读取环境变量、不使用 `appName`/`userId` 拼接，也不在空值或非法值时生成 UUID，避免同一 Session 重放改变业务身份。
+- `messages` 过滤结果为空时沿用原行为，任何鉴权模式均不读取/校验 `session.id()`、不发请求并正常完成；存在待写消息时先按已冻结配置选择鉴权，只有 API Key 分支执行上述读取和校验。
 - 校验失败不发请求；错误消息只描述字段和约束，不回显原始 ID、messages、metadata 或任何凭证。
-- trim 后的合法值作为唯一规范值传给 wrapper 并写入 body；同一 `Session` 的重复调用得到相同规范值。
+- trim 后的合法值作为 API Key 分支的唯一规范值传给四参数 wrapper overload 并写入 body；同一 `Session` 的重复调用得到相同规范值。
+- AK/SK-only 分支不得调用 `session.id()`，仍调用既有三参数 wrapper 方法；因此 null、空白、含连字符或其他旧输入不会新增本地拒绝。
 
 ### 4.4 鉴权状态机
 
@@ -200,7 +212,7 @@ normalizeSessionId(value):
 3. 创建每请求独立的 `HttpPost`，设置 `Accept: application/json`、`Content-Type: application/json`、`Authorization: Bearer <apiKey>`。
 4. 设置 connect/socket timeout 均为现有 `5000ms`，复用 `getHttpClient()`；不修改共享 header、不引入可变全局状态。
 5. 读取并消费 response entity。HTTP 非 2xx、空响应、非法 JSON 或业务 `code` 非 `0` 时抛 `VikingDataPlaneException`；只有成功 JSON 进入原有结果映射。
-6. 不自动重试。`AddSession` 的 `session_id` 是覆盖语义的业务身份键，不把它误称为服务端 no-op 幂等键；网络超时可能产生结果未知，SDK 禁止隐式重放，查询也保持同一策略。
+6. 不自动重试。API Key `AddSession` 的 `session_id` 是覆盖语义的业务身份键，不把它误称为服务端 no-op 幂等键；网络超时可能产生结果未知，SDK 禁止隐式重放，查询也保持同一策略。此规则不重定义 AK/SK-only 的请求契约。
 
 `VikingDataPlaneException extends IOException`，公开只读字段：
 
@@ -235,12 +247,13 @@ API Key 分支继续调用 `/api/knowledge/collection/search_knowledge`，请求
 
 ### 5.3 Memory 添加与检索
 
-API Key 分支复用当前路径：
+API Key 分支复用当前 path，并与 AK/SK 遗留调用明确隔离：
 
-- `AddSession`：`POST /api/memory/session/add`；wrapper 主方法签名改为 `addSession(String collectionName, String sessionId, List<Message> messages, Metadata metadata)`，body 必须包含规范化后的 `session_id`，并保留 `collection_name`、`messages`、`metadata`、`project_name`。
-- `SearchMemory`：`POST /api/memory/search`；body 保留 `collection_name`、`query`、`filter.user_id`、`filter.memory_type`、`limit`，并补充 `project_name`。
+- API Key `AddSession`：`POST /api/memory/session/add`；新增 overload `addSession(String collectionName, String sessionId, List<Message> messages, Metadata metadata)`，该 overload 只执行 Bearer 请求，body 必须包含规范化后的 `session_id`、`collection_name`、`project_name`、`messages`、`metadata`。
+- AK/SK `AddSession`：保留既有 `addSession(String collectionName, List<Message> messages, Metadata metadata)` 及其 `json()` / SignerV4 实现；body 仍且仅含 `collection_name`、`messages`、`metadata`，不新增 `session_id` 或 `project_name`。
+- API Key `SearchMemory`：`POST /api/memory/search`；body 保留 `collection_name`、`query`、`filter.user_id`、`filter.memory_type`、`limit`，并补充 `project_name`。AK/SK `SearchMemory` 继续使用原签名和原 body。
 
-`VikingMemoryService.addSessionToMemory` 在得到非空消息列表后读取 `session.id()`，把该值作为 `sessionId` 传给 wrapper；wrapper 在鉴权分支选择前执行 §4.3 的 trim/格式校验，并将规范值用于 API Key 与 AK/SK 两条 AddSession body，避免两种鉴权产生不同会话身份。请求体形态为：
+`VikingMemoryService` 在构造时冻结 `apiKey` 是否有效。`addSessionToMemory` 得到非空消息列表后按该状态分支：API Key 有效时才读取 `session.id()`，调用四参数 overload；API Key 无效且 AK/SK 完整时不读取 `session.id()`，直接调用旧三参数方法。双凭证因数据面选择 API Key，也进入四参数分支。API Key 请求体形态为：
 
 ```json
 {
@@ -252,9 +265,19 @@ API Key 分支复用当前路径：
 }
 ```
 
-两者均以 `Authorization: Bearer <apiKey>` 鉴权，这与 Python `vikingdb-python-sdk==0.1.32` 的 `APIKey.sign_request()` 一致。add 成功仍返回 `true`，search 成功仍映射 `data.result_list[*].memory_info.summary` 到 `MemoryEntry`；合法空列表返回空 `SearchMemoryResponse`。
+AK/SK AddSession 请求体保持当前精确形态：
 
-`VikingMemoryService.addSessionToMemory` 的无有效用户消息分支保持“不发请求并完成”。存在消息但 `session.id()` 为空白、超过 128 字符、不是字母开头或包含字母/数字/下划线以外字符时，wrapper 在执行 HTTP 前抛出 `IllegalArgumentException`；service 不包装该运行时异常，保持其类型经 `Completable` 向订阅方传播，且 HttpClient 不被调用。其他 API Key 异常由 wrapper 抛出，经 `Completable` / `Single` 向订阅方传播，不记录异常对象，避免第三方异常文本携带 Secret。
+```json
+{
+  "collection_name": "<session.appName()>",
+  "messages": [],
+  "metadata": {}
+}
+```
+
+API Key AddSession 与 SearchMemory 均以 `Authorization: Bearer <apiKey>` 鉴权，这与 Python `vikingdb-python-sdk==0.1.32` 的 `APIKey.sign_request()` 一致。add 成功仍返回 `true`，search 成功仍映射 `data.result_list[*].memory_info.summary` 到 `MemoryEntry`；合法空列表返回空 `SearchMemoryResponse`。AK/SK-only add/search 的返回和失败映射不在本需求中改变。
+
+`VikingMemoryService.addSessionToMemory` 的无有效用户消息分支保持“不发请求并完成”。实际选中 API Key 且存在消息时，`session.id()` 若为空白、超过 128 字符、不是字母开头或包含字母/数字/下划线以外字符，四参数 overload 在执行 HTTP 前抛出 `IllegalArgumentException`；service 不包装该运行时异常，保持其类型经 `Completable` 向订阅方传播，且 HttpClient 不被调用。AK/SK-only 即使 `Session.id()` 为 null、空白或不符合该正则，也不得读取或校验它，旧三参数请求照常执行。其他 API Key 异常由 wrapper 抛出，经 `Completable` / `Single` 向订阅方传播，不记录异常对象，避免第三方异常文本携带 Secret。
 
 ### 5.4 流程图
 
@@ -273,11 +296,15 @@ API Key 分支复用当前路径：
   └─ API Key 无效 → 既有 AK/SK json()/SignerV4 路径
 
 Memory AddSession（有有效消息）
-  ├─ 读取 Session.id()
-  ├─ trim + ^[A-Za-z][A-Za-z0-9_]{0,127}$ 校验
-  │    └─ 无效 → IllegalArgumentException，不发请求
-  ├─ 将同一规范值传给 wrapper 并写入 session_id
-  └─ 发送一次；失败不自动重试
+  ├─ API Key 有效
+  │    ├─ 读取 Session.id()
+  │    ├─ trim + ^[A-Za-z][A-Za-z0-9_]{0,127}$ 校验
+  │    │    └─ 无效 → IllegalArgumentException，不发请求
+  │    ├─ 调用四参数 overload，写入 session_id/project_name
+  │    └─ 发送一次；失败不自动重试
+  └─ API Key 无效且 AK/SK 完整
+       ├─ 不读取/校验 Session.id()
+       └─ 调用原三参数方法，原 body + json()/SignerV4
 ```
 
 ## 6. 数据、状态与并发
@@ -285,10 +312,10 @@ Memory AddSession（有有效消息）
 - 不新增数据库、Schema、DDL/DML、迁移、回填、缓存或持久化状态。
 - API Key、project、resource ID、AK/SK 在对象构造时解析并保存为不可变字段；后续环境变量变化不改变已构造实例，保证同一实例选择稳定。
 - wrapper 共享现有 HttpClient，但每次调用新建 `HttpPost`、body 和 header；不把 Authorization 写入静态 `API_INFO_LIST` 或共享 `ServiceInfo`，并发请求不会串 Key。
-- 无事务或跨资源原子性。`AddSession` 是唯一写副作用；保持单次发送、无自动重试。服务端对相同 `session_id` 的语义是覆盖此前事件版本并撤回旧画像事件，不是追加，也不保证 no-op。
-- 同一个 ADK `Session` 的正常调用、失败后的显式重放或调用方重试必须复用同一个规范化 `session_id`；不得在 wrapper、重试器或异常恢复路径生成新 ID。调用方只有要创建独立会话/消息批次时才应创建新的、满足约束的 ADK Session ID。
-- 网络超时或连接中断后的写入结果可能未知；SDK 直接传播 `NETWORK`，不自行判断成功与否。调用方若根据业务确认重试，应使用原 `Session` 和相同消息；该操作触发服务端覆盖语义，不能假设不会重新抽取记忆。
-- 同一 `session_id` 的并发写入没有本地锁或顺序保证，最终结果取决于服务端完成顺序；调用方必须串行化同一 Session 的写入。不同合法 `session_id` 可并发，且请求 body/header 均为每调用独立对象。
+- 无事务或跨资源原子性。API Key `AddSession` 是唯一新增写副作用路径；保持单次发送、无自动重试。服务端对相同 `session_id` 的语义是覆盖此前事件版本并撤回旧画像事件，不是追加，也不保证 no-op。AK/SK-only 沿用原调用链，不由本设计增加幂等保证或调用约束。
+- API Key 模式下，同一个 ADK `Session` 的正常调用、失败后的显式重放或调用方重试必须复用同一个规范化 `session_id`；不得在 wrapper、重试器或异常恢复路径生成新 ID。调用方只有要创建独立会话/消息批次时才应创建新的、满足约束的 ADK Session ID。
+- API Key AddSession 网络超时或连接中断后的写入结果可能未知；SDK 直接传播 `NETWORK`，不自行判断成功与否。调用方若根据业务确认重试，应使用原 `Session` 和相同消息；该操作触发服务端覆盖语义，不能假设不会重新抽取记忆。
+- API Key 模式下同一 `session_id` 的并发写入没有本地锁或顺序保证，最终结果取决于服务端完成顺序；调用方必须串行化同一 Session 的写入。不同合法 `session_id` 可并发，且请求 body/header 均为每调用独立对象。
 - API key-only 跳过预检查不等于 collection 可选；资源不存在由首个数据面请求以 `RESOURCE` 或服务端错误暴露。
 
 ## 7. 兼容性、权限与安全
@@ -297,8 +324,8 @@ Memory AddSession（有有效消息）
 
 - 保留所有面向用户的 `MemoryService`/Knowledgebase public 构造、static factory、builder 方法、返回类型和 AK/SK 环境变量；`addSessionToMemory(Session)` 签名不变。
 - 新增重载和 builder 方法，不改已有方法签名；`backendInstance` 不受新增 Viking 字段影响。
-- `VikingMemoryWrapper` 是 integration 层实现接缝；其 AddSession 主签名增加 `sessionId` 参数，并同步修改仓内唯一调用方与测试。该签名变化不暴露到 `MemoryService` 接口；不保留会生成不稳定 ID 的三参数旁路。
-- AK/SK-only 时仍调用现有 `json()` 与 SignerV4，管理预检查、返回映射维持原行为。
+- `VikingMemoryWrapper` 保留现有三参数 AddSession 签名供 AK/SK-only 使用，另增 API Key 专用四参数 overload；两者不互相委托，避免旧路径被新字段或校验污染。该新增 overload 不暴露到 `MemoryService` 公共接口。
+- AK/SK-only 时 `VikingMemoryService` 不读取 `Session.id()`，wrapper 仍调用现有 `json()` 与 SignerV4，AddSession body、管理预检查、返回与失败映射维持原行为；null、空白、含连字符等旧 Session ID 不会新增失败。
 - 两个 Viking API Key 绝不交叉兜底，也不读取 `MODEL_AGENT_API_KEY`。
 - 只支持现有固定 Volcengine endpoint；不新增 BytePlus 行为。
 
@@ -314,15 +341,15 @@ Memory AddSession（有有效消息）
 ## 8. 可靠性、性能与可观测性
 
 - 超时：API Key connect/socket 均为 5 秒，与现有 wrapper 配置一致。
-- 重试：SDK 不重试；`AddSession` 显式重放复用原 `session_id` 并遵循服务端覆盖语义，网络不确定性留给调用方决策；任何失败都不得换身份或生成新 ID 后重试。
+- 重试：API Key 请求 SDK 不重试；API Key `AddSession` 显式重放复用原 `session_id` 并遵循服务端覆盖语义，网络不确定性留给调用方决策；任何失败都不得换身份或生成新 ID 后重试。AK/SK-only 重试/失败行为保持现状。
 - 性能：每次请求仅增加一次鉴权分支和 header 设置；复用现有连接池。API key-only 少一次或两次管理调用，未引入集合、线程或缓存增长。
 - 可观测性：不新增业务 Metrics 或 Trace；失败异常保留 operation、failure kind、status、request ID，满足 SDK 调用方诊断。日志仅记录模式和非敏感定位字段。
-- 正常空结果与错误严格分离；无结果不会抛异常，依赖失败不会返回空列表或 `false`。
+- API Key 路径的正常空结果与错误严格分离；无结果不会抛异常，依赖失败不会返回空列表或 `false`。AK/SK-only 的既有返回/失败语义不在本需求中改变。
 
 ## 9. 发布、灰度与回滚
 
 - 无 DB、配置中心、服务部署或 Feature Gate；能力随 SDK 新版本交付。未配置新 API Key 的用户仍走 AK/SK，形成天然兼容路径。
-- 发布说明与中英文 README 同步列出配置优先级、三条数据面范围、已有 collection 前提、管理操作 AK/SK 要求，以及 Memory AddSession 对 ADK Session ID 的格式与重复覆盖语义。
+- 发布说明与中英文 README 同步列出配置优先级、三条数据面范围、已有 collection 前提、管理操作 AK/SK 要求，以及仅 API Key Memory AddSession 对 ADK Session ID 的格式与重复覆盖语义；明确 AK/SK-only 不受该新约束。
 - 回滚方式为回退 SDK 版本/对应 commit，恢复 AK/SK-only；没有数据清理、配置回滚或补偿动作。API Key 环境变量在旧版本中不会被消费。
 - 上线前以 mock 单测验证全部协议分支；真实 Viking 凭证与网络集成由后续集成/E2E 节点按环境执行，本设计不要求把凭证写入仓库。
 
@@ -336,8 +363,8 @@ Memory AddSession（有有效消息）
 | T-002 | `KnowledgeBaseTest` | 旧 builder 仍可构造；新增 builder 参数准确传入 Viking config；非 Viking/backendInstance 不受影响 |
 | T-003 | `VikingKnowledgebaseBackendTest` | API key-only 跳过预检查；双凭证执行预检查；AK/SK-only 兼容；无凭证报错；API Key search、空 query、addDoc 管理边界 |
 | T-004 | `VikingKnowledgebaseWrapperTest` | Bearer header、HTTPS host/path、project/resource ID/filter/后处理 body、5 秒超时、成功/空结果；401/403/404/5xx/业务 code/网络/非法 JSON 分类；失败不走 AK/SK 且假 Key 不在异常 |
-| T-005 | `VikingMemoryServiceTest` | 三个构造入口、优先级、API key-only/双凭证/AK-SK-only 初始化；有消息时 `Session.id()` 原值传给 wrapper；无消息不读取/校验 ID 且不发请求；空白/非法 ID 由 wrapper 前置拒绝并经 Rx 传播；add/search 异常经 Rx 传播 |
-| T-006 | `VikingMemoryWrapperTest` | 新四参数 add 签名；trim 后的合法 `session_id` 与 collection/project/messages/metadata 一起进入 body；null、空白、超长、非字母开头、非法字符均在 HTTP 前失败；相同 ID 的两次显式调用捕获到相同 `session_id` 且每次只发送一次；add/search Bearer header、HTTPS path、成功/空结果、HTTP/业务/网络/解析失败分类、无降级；假 API Key/AK/SK/Authorization 和非法 ID 原值均不出现在异常/cause/日志 |
+| T-005 | `VikingMemoryServiceTest` | 三个构造入口、优先级、API key-only/双凭证/AK-SK-only 初始化；API Key/双凭证有消息时读取并透传 `Session.id()`，空白/非法 ID 经 Rx 传播且不发请求；AK/SK-only 有消息时不调用 `Session.id()`（mock 可设为调用即抛错）并使用三参数 wrapper；无消息在两种模式均不读取 ID、不发请求；add/search 异常按各路径既有契约传播 |
+| T-006 | `VikingMemoryWrapperTest` | API Key 四参数 overload 将合法 `session_id` 与 collection/project/messages/metadata 写入 Bearer body，覆盖全部合法/非法边界、相同 ID 重放、失败分类、无自动重试/降级和泄密反例；AK/SK 三参数方法仍调用 `json()`/SignerV4，请求 JSON 精确不含 `session_id`、`project_name`，且 null/空白/含连字符等 Session ID 不构成其输入或失败条件 |
 | T-007 | `README.md` / `README_zh.md` 人工 diff | 变量、显式入口、优先级、已有 collection 与管理边界中英文一致；只有占位凭证 |
 
 所有 HTTP 单测通过 `setHttpClient(mockHttpClient)` 注入现有 client，捕获 `HttpPost` 后检查 URI、header、RequestConfig 与 JSON body；测试输出不得打印 header。
@@ -364,8 +391,9 @@ JaCoCo 报告路径为 `core/target/site/jacoco/jacoco.xml` / `index.html`。增
 | 双凭证请求身份不确定 | 构造时冻结选择；数据面 API Key，管理面 AK/SK |
 | 服务失败被误判为空结果 | API Key 非成功统一抛分类异常；仅成功空数组为空结果 |
 | Key 经日志/异常泄露 | 不打印 header/body/config；异常仅含安全元数据；单测做 secret 反向断言 |
-| Session ID 缺失或不符合服务端格式 | 统一从 `Session.id()` 获取，trim 后按官方 `[A-Za-z][A-Za-z0-9_]{0,127}` 前置校验；不生成替代 ID，不发非法请求 |
-| 写请求超时后重复或覆盖 | 不增加自动重试；显式重放复用原 ID，文档和测试明确相同 ID 是覆盖语义且同 Session 写入需串行 |
+| API Key Session ID 缺失或不符合服务端格式 | 仅 API Key AddSession 从 `Session.id()` 获取，trim 后按官方 `[A-Za-z][A-Za-z0-9_]{0,127}` 前置校验；不生成替代 ID，不发非法请求 |
+| 新 `session_id` 契约污染 AK/SK | API Key 与 AK/SK 使用四参数/三参数两个独立 overload；AK/SK 不读取 ID，body 精确保持原三字段，并以兼容测试锁定 |
+| API Key 写请求超时后重复或覆盖 | 不增加自动重试；显式重放复用原 ID，文档和测试明确相同 ID 是覆盖语义且同 Session 写入需串行 |
 | 直连实现与未来 Java SDK 重复 | 当前依赖无等价能力且不升级依赖；未来 SDK 具备同等契约时可内部替换，不影响公共入口 |
 
 无阻塞待确认项。
@@ -380,4 +408,5 @@ JaCoCo 报告路径为 `core/target/site/jacoco/jacoco.xml` / `index.html`。增
 | REQ-004 AK/SK 兼容与双凭证 | §4.4、§7.1 | TASK-002、TASK-004、TASK-006 | T-002、T-003、T-005 |
 | REQ-005 可诊断且不泄密 | §5.1、§7.2、§8 | TASK-003、TASK-005、TASK-006 | T-004、T-005、T-006 |
 | REQ-006 文档可发现 | §9、§10 | TASK-007 | T-007 |
-| DESIGN-REV-001 AddSession `session_id` 契约 | §1.3、§4.3、§5.3、§6、§8、§10.1 | TASK-004、TASK-005、TASK-006、TASK-007 | T-005、T-006、T-007 |
+| DESIGN-REV-001 AddSession `session_id` 契约 | §1.4、§4.3、§5.3、§6、§8、§10.1 | TASK-004、TASK-005、TASK-006、TASK-007 | T-005、T-006、T-007 |
+| DESIGN-REV-002 AK/SK 兼容边界 | §1.5、§4.3、§5.3、§5.4、§7.1、§10.1 | TASK-004、TASK-005、TASK-006、TASK-007 | T-005、T-006、T-007 |

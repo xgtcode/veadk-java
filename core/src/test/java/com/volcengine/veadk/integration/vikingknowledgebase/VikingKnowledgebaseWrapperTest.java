@@ -4,11 +4,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.volcengine.error.SdkError;
 import com.volcengine.model.response.RawResponse;
+import com.volcengine.veadk.integration.viking.VikingApiKeyHttpClient;
 import com.volcengine.veadk.utils.JSONUtil;
 import java.util.Collections;
 import java.util.HashMap;
@@ -131,5 +135,35 @@ class VikingKnowledgebaseWrapperTest {
                 vikingKnowledgebaseWrapper.searchKnowledge(
                         "test-collection", "query", 1, new HashMap<>(), false, 0);
         assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void searchKnowledge_apiKeySuccessUsesBearerClientMapping() throws Exception {
+        VikingApiKeyHttpClient apiKeyClient = Mockito.mock(VikingApiKeyHttpClient.class);
+        when(apiKeyClient.post(anyString(), anyString()))
+                .thenReturn(
+                        new VikingApiKeyHttpClient.Response(
+                                200,
+                                "{\"code\":0,\"data\":{\"result_list\":[{\"content\":\"answer\"}]}}"));
+        VikingKnowledgebaseWrapper wrapper =
+                new VikingKnowledgebaseWrapper(null, null, apiKeyClient);
+
+        List<KnowledgebaseEntry> result = wrapper.searchKnowledge("KbApp", "q", 3, null, true, 3);
+
+        assertEquals(1, result.size());
+        assertEquals("answer", result.get(0).getContent());
+        verify(apiKeyClient).post(eq("/api/knowledge/collection/search_knowledge"), anyString());
+    }
+
+    @Test
+    void searchKnowledge_apiKeyFailureDoesNotFallbackToAkSk() throws Exception {
+        VikingApiKeyHttpClient apiKeyClient = Mockito.mock(VikingApiKeyHttpClient.class);
+        when(apiKeyClient.post(anyString(), anyString()))
+                .thenReturn(new VikingApiKeyHttpClient.Response(401, "unauthorized"));
+        VikingKnowledgebaseWrapper wrapper =
+                Mockito.spy(new VikingKnowledgebaseWrapper("ak", "sk", apiKeyClient));
+
+        assertTrue(wrapper.searchKnowledge("KbApp", "q", 3, null, true, 3).isEmpty());
+        verify(wrapper, never()).json(anyString(), isNull(), anyString());
     }
 }

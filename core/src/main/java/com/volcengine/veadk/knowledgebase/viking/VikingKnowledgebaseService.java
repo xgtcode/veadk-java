@@ -30,8 +30,17 @@ public class VikingKnowledgebaseService implements BaseKnowledgebaseService {
     private final KnowledgeBase knowledgeBase;
 
     public VikingKnowledgebaseService(String appName) {
+        this(appName, null);
+    }
+
+    public VikingKnowledgebaseService(String appName, String apiKey) {
         this.knowledgeBase =
-                KnowledgeBase.builder().backend("viking").appName(appName).topK(5).build();
+                KnowledgeBase.builder()
+                        .backend("viking")
+                        .appName(appName)
+                        .apiKey(apiKey)
+                        .topK(5)
+                        .build();
     }
 
     @Override

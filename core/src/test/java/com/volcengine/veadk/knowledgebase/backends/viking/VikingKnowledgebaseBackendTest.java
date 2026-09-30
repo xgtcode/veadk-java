@@ -45,6 +45,8 @@ class VikingKnowledgebaseBackendTest {
                                 })) {
             mockedEnv.when(EnvUtil::getAccessKey).thenReturn("ak");
             mockedEnv.when(EnvUtil::getSecretKey).thenReturn("sk");
+            mockedEnv.when(EnvUtil::getOptionalAccessKey).thenReturn("ak");
+            mockedEnv.when(EnvUtil::getOptionalSecretKey).thenReturn("sk");
 
             new VikingKnowledgebaseBackend(collectionName);
 
@@ -66,6 +68,8 @@ class VikingKnowledgebaseBackendTest {
                                 })) {
             mockedEnv.when(EnvUtil::getAccessKey).thenReturn("ak");
             mockedEnv.when(EnvUtil::getSecretKey).thenReturn("sk");
+            mockedEnv.when(EnvUtil::getOptionalAccessKey).thenReturn("ak");
+            mockedEnv.when(EnvUtil::getOptionalSecretKey).thenReturn("sk");
 
             new VikingKnowledgebaseBackend(collectionName);
 
@@ -90,6 +94,18 @@ class VikingKnowledgebaseBackendTest {
         assertEquals("content1", entries.get(0).getContent());
         assertEquals("v", entries.get(0).getMetadata().get("k"));
         verify(wrapper).searchKnowledge("KbApp", "q", 7, null, false, 1);
+    }
+
+    @Test
+    void apiKeyOnlySkipsCollectionManagementAndRejectsAddDoc() {
+        VikingKnowledgebaseWrapper wrapper = Mockito.mock(VikingKnowledgebaseWrapper.class);
+        VikingKnowledgebaseBackend backend =
+                new VikingKnowledgebaseBackend("KbApp", wrapper, true, 3, false);
+
+        Mockito.verify(wrapper, Mockito.never()).isCollectionExists(Mockito.anyString());
+        Mockito.verify(wrapper, Mockito.never()).createCollection(Mockito.anyString());
+        assertThrows(IllegalStateException.class, () -> backend.addDoc("tos://bucket/doc.md"));
+        Mockito.verify(wrapper, Mockito.never()).addDoc(Mockito.anyString(), Mockito.anyString());
     }
 
     @Test

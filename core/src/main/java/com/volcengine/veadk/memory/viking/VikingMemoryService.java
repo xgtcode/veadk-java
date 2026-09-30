@@ -27,6 +27,7 @@ import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Single;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,6 +41,10 @@ public class VikingMemoryService implements BaseMemoryService {
     private List<String> builtinEventTypes;
 
     public VikingMemoryService(String appName) {
+        this(appName, null);
+    }
+
+    public VikingMemoryService(String appName, String explicitApiKey) {
         if (null != appName && !appName.matches("^[a-zA-Z][a-zA-Z0-9_]*$")) {
             throw new IllegalArgumentException(
                     "appName can only contain English letters, numbers, and underscores, and must"
@@ -49,9 +54,18 @@ public class VikingMemoryService implements BaseMemoryService {
 
         this.builtinEventTypes = List.of(EnvUtil.getVikingMmemoryType().split(","));
 
-        vikingMemoryWrapper =
-                new VikingMemoryWrapper(EnvUtil.getAccessKey(), EnvUtil.getSecretKey());
-        if (!vikingMemoryWrapper.isCollectionExists(appName)) {
+        String apiKey = EnvUtil.resolveVikingMemoryApiKey(explicitApiKey);
+        String accessKey = EnvUtil.getOptionalAccessKey();
+        String secretKey = EnvUtil.getOptionalSecretKey();
+        boolean hasCompleteAkSk =
+                StringUtils.isNotBlank(accessKey) && StringUtils.isNotBlank(secretKey);
+        if (apiKey == null && !hasCompleteAkSk) {
+            throw new IllegalStateException(
+                    "Viking Memory requires DATABASE_VIKINGMEM_API_KEY or both"
+                            + " VOLCENGINE_ACCESS_KEY and VOLCENGINE_SECRET_KEY.");
+        }
+        vikingMemoryWrapper = new VikingMemoryWrapper(accessKey, secretKey, apiKey);
+        if (hasCompleteAkSk && !vikingMemoryWrapper.isCollectionExists(appName)) {
             vikingMemoryWrapper.createCollection(appName, this.builtinEventTypes);
         }
     }

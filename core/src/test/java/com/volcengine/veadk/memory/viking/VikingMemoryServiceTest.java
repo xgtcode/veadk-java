@@ -32,6 +32,8 @@ class VikingMemoryServiceTest {
                         Mockito.mockConstruction(VikingMemoryWrapper.class)) {
             mockedEnv.when(EnvUtil::getAccessKey).thenReturn("ak");
             mockedEnv.when(EnvUtil::getSecretKey).thenReturn("sk");
+            mockedEnv.when(EnvUtil::getOptionalAccessKey).thenReturn("ak");
+            mockedEnv.when(EnvUtil::getOptionalSecretKey).thenReturn("sk");
             mockedEnv.when(EnvUtil::getVikingMmemoryType).thenReturn("sys_event_v1");
 
             assertThrows(IllegalArgumentException.class, () -> new VikingMemoryService("9bad"));
@@ -51,6 +53,8 @@ class VikingMemoryServiceTest {
                                 })) {
             mockedEnv.when(EnvUtil::getAccessKey).thenReturn("ak");
             mockedEnv.when(EnvUtil::getSecretKey).thenReturn("sk");
+            mockedEnv.when(EnvUtil::getOptionalAccessKey).thenReturn("ak");
+            mockedEnv.when(EnvUtil::getOptionalSecretKey).thenReturn("sk");
             mockedEnv.when(EnvUtil::getVikingMmemoryType).thenReturn("sys_event_v1,user_event_v1");
 
             VikingMemoryService service = new VikingMemoryService(appName);
@@ -58,8 +62,8 @@ class VikingMemoryServiceTest {
 
             verify(wrapperMock).isCollectionExists(appName);
             verify(wrapperMock, never()).createCollection(Mockito.eq(appName), Mockito.anyList());
-            mockedEnv.verify(EnvUtil::getAccessKey);
-            mockedEnv.verify(EnvUtil::getSecretKey);
+            mockedEnv.verify(EnvUtil::getOptionalAccessKey);
+            mockedEnv.verify(EnvUtil::getOptionalSecretKey);
             mockedEnv.verify(EnvUtil::getVikingMmemoryType);
         }
     }
@@ -77,6 +81,8 @@ class VikingMemoryServiceTest {
                                 })) {
             mockedEnv.when(EnvUtil::getAccessKey).thenReturn("ak");
             mockedEnv.when(EnvUtil::getSecretKey).thenReturn("sk");
+            mockedEnv.when(EnvUtil::getOptionalAccessKey).thenReturn("ak");
+            mockedEnv.when(EnvUtil::getOptionalSecretKey).thenReturn("sk");
             mockedEnv.when(EnvUtil::getVikingMmemoryType).thenReturn("sys_event_v1,user_event_v1");
 
             VikingMemoryService service = new VikingMemoryService(appName);
@@ -105,6 +111,8 @@ class VikingMemoryServiceTest {
                                 })) {
             mockedEnv.when(EnvUtil::getAccessKey).thenReturn("ak");
             mockedEnv.when(EnvUtil::getSecretKey).thenReturn("sk");
+            mockedEnv.when(EnvUtil::getOptionalAccessKey).thenReturn("ak");
+            mockedEnv.when(EnvUtil::getOptionalSecretKey).thenReturn("sk");
             mockedEnv.when(EnvUtil::getVikingMmemoryType).thenReturn("sys_event_v1");
 
             VikingMemoryService service = new VikingMemoryService(appName);
@@ -152,6 +160,8 @@ class VikingMemoryServiceTest {
                                 })) {
             mockedEnv.when(EnvUtil::getAccessKey).thenReturn("ak");
             mockedEnv.when(EnvUtil::getSecretKey).thenReturn("sk");
+            mockedEnv.when(EnvUtil::getOptionalAccessKey).thenReturn("ak");
+            mockedEnv.when(EnvUtil::getOptionalSecretKey).thenReturn("sk");
             mockedEnv.when(EnvUtil::getVikingMmemoryType).thenReturn("sys_event_v1");
 
             VikingMemoryService service = new VikingMemoryService(appName);
@@ -214,6 +224,8 @@ class VikingMemoryServiceTest {
                                 })) {
             mockedEnv.when(EnvUtil::getAccessKey).thenReturn("ak");
             mockedEnv.when(EnvUtil::getSecretKey).thenReturn("sk");
+            mockedEnv.when(EnvUtil::getOptionalAccessKey).thenReturn("ak");
+            mockedEnv.when(EnvUtil::getOptionalSecretKey).thenReturn("sk");
             mockedEnv.when(EnvUtil::getVikingMmemoryType).thenReturn("sys_event_v1");
 
             VikingMemoryService service = new VikingMemoryService(appName);
@@ -231,6 +243,23 @@ class VikingMemoryServiceTest {
             assertThrows(
                     RuntimeException.class,
                     () -> service.addSessionToMemory(session).blockingAwait());
+        }
+    }
+
+    @Test
+    void explicitApiKeyConstructorSkipsManagementWithoutAkSk() {
+        try (MockedStatic<EnvUtil> mockedEnv = Mockito.mockStatic(EnvUtil.class);
+                MockedConstruction<VikingMemoryWrapper> mockedCtor =
+                        Mockito.mockConstruction(VikingMemoryWrapper.class)) {
+            mockedEnv
+                    .when(() -> EnvUtil.resolveVikingMemoryApiKey("explicit-key"))
+                    .thenReturn("explicit-key");
+            mockedEnv.when(EnvUtil::getVikingMmemoryType).thenReturn("sys_event_v1");
+
+            new VikingMemoryService("MemoryApp", "explicit-key");
+
+            VikingMemoryWrapper wrapper = mockedCtor.constructed().get(0);
+            verify(wrapper, never()).isCollectionExists(Mockito.anyString());
         }
     }
 
@@ -257,6 +286,8 @@ class VikingMemoryServiceTest {
                                 })) {
             mockedEnv.when(EnvUtil::getAccessKey).thenReturn("ak");
             mockedEnv.when(EnvUtil::getSecretKey).thenReturn("sk");
+            mockedEnv.when(EnvUtil::getOptionalAccessKey).thenReturn("ak");
+            mockedEnv.when(EnvUtil::getOptionalSecretKey).thenReturn("sk");
             mockedEnv.when(EnvUtil::getVikingMmemoryType).thenReturn("sys_event_v1,user_event_v1");
 
             VikingMemoryService service = new VikingMemoryService(appName);

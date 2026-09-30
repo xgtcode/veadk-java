@@ -23,6 +23,7 @@ import com.volcengine.model.Credentials;
 import com.volcengine.model.ServiceInfo;
 import com.volcengine.model.response.RawResponse;
 import com.volcengine.service.BaseServiceImpl;
+import com.volcengine.veadk.integration.viking.VikingApiKeyHttpClient;
 import com.volcengine.veadk.utils.JSONUtil;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -134,10 +135,29 @@ public class VikingKnowledgebaseWrapper extends BaseServiceImpl {
                 }
             };
 
+    private final VikingApiKeyHttpClient apiKeyClient;
+
     public VikingKnowledgebaseWrapper(String accessKey, String secretKey) {
+        this(accessKey, secretKey, (String) null);
+    }
+
+    public VikingKnowledgebaseWrapper(String accessKey, String secretKey, String apiKey) {
         super(SERVICE_INFO, API_INFO_LIST);
-        setAccessKey(accessKey);
-        setSecretKey(secretKey);
+        if (accessKey != null && secretKey != null) {
+            setAccessKey(accessKey);
+            setSecretKey(secretKey);
+        }
+        this.apiKeyClient = apiKey == null ? null : new VikingApiKeyHttpClient(apiKey);
+    }
+
+    VikingKnowledgebaseWrapper(
+            String accessKey, String secretKey, VikingApiKeyHttpClient apiKeyClient) {
+        super(SERVICE_INFO, API_INFO_LIST);
+        if (accessKey != null && secretKey != null) {
+            setAccessKey(accessKey);
+            setSecretKey(secretKey);
+        }
+        this.apiKeyClient = apiKeyClient;
     }
 
     public boolean isCollectionExists(String collectionName) {
@@ -263,22 +283,32 @@ public class VikingKnowledgebaseWrapper extends BaseServiceImpl {
             body.put("post_processing", postProcessing);
 
             String bodyStr = JSONUtil.toJson(body);
-            RawResponse response = json("SearchKnowledge", null, bodyStr);
+            JsonNode rootNode;
+            if (apiKeyClient != null) {
+                VikingApiKeyHttpClient.Response response =
+                        apiKeyClient.post("/api/knowledge/collection/search_knowledge", bodyStr);
+                rootNode = parseApiKeyResponse(response, "SearchKnowledge", collectionName);
+                if (rootNode == null) {
+                    return Collections.emptyList();
+                }
+            } else {
+                RawResponse response = json("SearchKnowledge", null, bodyStr);
 
-            if (response.getCode() != SdkError.SUCCESS.getNumber()) {
-                log.error(
+                if (response.getCode() != SdkError.SUCCESS.getNumber()) {
+                    log.error(
+                            "SearchKnowledge request:{}, raw response:{}",
+                            bodyStr,
+                            response.getException());
+                    return Collections.emptyList();
+                }
+
+                log.debug(
                         "SearchKnowledge request:{}, raw response:{}",
                         bodyStr,
-                        response.getException());
-                return Collections.emptyList();
+                        JSONUtil.parseJson(response.getData()));
+
+                rootNode = JSONUtil.parseJson(response.getData());
             }
-
-            log.debug(
-                    "SearchKnowledge request:{}, raw response:{}",
-                    bodyStr,
-                    JSONUtil.parseJson(response.getData()));
-
-            JsonNode rootNode = JSONUtil.parseJson(response.getData());
             JsonNode resultList = rootNode.path("data").path("result_list");
 
             List<KnowledgebaseEntry> entries = new ArrayList<>();
@@ -307,5 +337,38 @@ public class VikingKnowledgebaseWrapper extends BaseServiceImpl {
             log.error("searchKnowledge failed", e);
             return Collections.emptyList();
         }
+    }
+
+    private JsonNode parseApiKeyResponse(
+            VikingApiKeyHttpClient.Response response, String operation, String collectionName)
+            throws IOException {
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            log.error(
+                    "Viking API Key request failed: operation={}, collection={}, authMode=API_KEY,"
+                            + " status={}",
+                    operation,
+                    collectionName,
+                    response.statusCode());
+            return null;
+        }
+        JsonNode root = JSONUtil.parseJson(response.body());
+        JsonNode code = root.path("code");
+        JsonNode error = root.path("ResponseMetadata").path("Error");
+        if ((code.isNumber() && code.asInt() != 0) || (error.isObject() && !error.isEmpty())) {
+            log.error(
+                    "Viking API Key request failed: operation={}, collection={}, authMode=API_KEY,"
+                            + " status={}, code={}, requestId={}",
+                    operation,
+                    collectionName,
+                    response.statusCode(),
+                    code.isNumber() ? code.asText() : error.path("Code").asText("unknown"),
+                    root.path("request_id")
+                            .asText(
+                                    root.path("ResponseMetadata")
+                                            .path("RequestId")
+                                            .asText("unknown")));
+            return null;
+        }
+        return root;
     }
 }

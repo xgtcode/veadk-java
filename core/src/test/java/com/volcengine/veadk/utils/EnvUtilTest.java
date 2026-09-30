@@ -46,6 +46,34 @@ class EnvUtilTest {
     }
 
     @Test
+    @SetEnvironmentVariable(key = "DATABASE_VIKING_API_KEY", value = " env-kb-key ")
+    void resolveVikingApiKey_prefersValidExplicitValue() {
+        assertThat(EnvUtil.resolveVikingApiKey(" explicit-kb-key ")).isEqualTo("explicit-kb-key");
+    }
+
+    @Test
+    @SetEnvironmentVariable(key = "DATABASE_VIKING_API_KEY", value = " env-kb-key ")
+    void resolveVikingApiKey_invalidExplicitValueFallsBackToEnvironment() {
+        assertThat(EnvUtil.resolveVikingApiKey("none")).isEqualTo("env-kb-key");
+    }
+
+    @Test
+    @SetEnvironmentVariable(key = "DATABASE_VIKINGMEM_API_KEY", value = " memory-key ")
+    @SetEnvironmentVariable(key = "DATABASE_VIKING_API_KEY", value = " knowledge-key ")
+    void vikingApiKeysAreDomainIsolated() {
+        assertThat(EnvUtil.resolveVikingApiKey(null)).isEqualTo("knowledge-key");
+        assertThat(EnvUtil.resolveVikingMemoryApiKey(null)).isEqualTo("memory-key");
+    }
+
+    @Test
+    @ClearEnvironmentVariable(key = "VOLCENGINE_ACCESS_KEY")
+    @ClearEnvironmentVariable(key = "VOLCENGINE_SECRET_KEY")
+    void optionalAkSkDoNotThrowWhenMissing() {
+        assertThat(EnvUtil.getOptionalAccessKey()).isNull();
+        assertThat(EnvUtil.getOptionalSecretKey()).isNull();
+    }
+
+    @Test
     @SetEnvironmentVariable(
             key = "OBSERVABILITY_OPENTELEMETRY_TLS_ENDPOINT",
             value = "test_tls_endpoint")

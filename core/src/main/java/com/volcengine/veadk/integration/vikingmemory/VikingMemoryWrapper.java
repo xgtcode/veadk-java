@@ -26,6 +26,7 @@ import com.volcengine.model.Credentials;
 import com.volcengine.model.ServiceInfo;
 import com.volcengine.model.response.RawResponse;
 import com.volcengine.service.BaseServiceImpl;
+import com.volcengine.veadk.integration.viking.VikingApiKeyHttpClient;
 import com.volcengine.veadk.utils.JSONUtil;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -135,10 +136,28 @@ public class VikingMemoryWrapper extends BaseServiceImpl {
                 }
             };
 
+    private final VikingApiKeyHttpClient apiKeyClient;
+
     public VikingMemoryWrapper(String accessKey, String secretKey) {
+        this(accessKey, secretKey, (String) null);
+    }
+
+    public VikingMemoryWrapper(String accessKey, String secretKey, String apiKey) {
         super(SERVICE_INFO, API_INFO_LIST);
-        setAccessKey(accessKey);
-        setSecretKey(secretKey);
+        if (accessKey != null && secretKey != null) {
+            setAccessKey(accessKey);
+            setSecretKey(secretKey);
+        }
+        this.apiKeyClient = apiKey == null ? null : new VikingApiKeyHttpClient(apiKey);
+    }
+
+    VikingMemoryWrapper(String accessKey, String secretKey, VikingApiKeyHttpClient apiKeyClient) {
+        super(SERVICE_INFO, API_INFO_LIST);
+        if (accessKey != null && secretKey != null) {
+            setAccessKey(accessKey);
+            setSecretKey(secretKey);
+        }
+        this.apiKeyClient = apiKeyClient;
     }
 
     public boolean isCollectionExists(String collectionName) {
@@ -213,17 +232,27 @@ public class VikingMemoryWrapper extends BaseServiceImpl {
 
         String bodyStr = JSONUtil.toJson(body);
 
-        RawResponse response = json("AddSession", null, bodyStr);
-        if (response.getCode() != SdkError.SUCCESS.getNumber()) {
-            log.error("AddSession request:{}, raw response:{}", bodyStr, response.getException());
-            return false;
+        JsonNode rootNode;
+        if (apiKeyClient != null) {
+            VikingApiKeyHttpClient.Response response =
+                    apiKeyClient.post("/api/memory/session/add", bodyStr);
+            rootNode = parseApiKeyResponse(response, "AddSession", collectionName);
+            if (rootNode == null) {
+                return false;
+            }
+        } else {
+            RawResponse response = json("AddSession", null, bodyStr);
+            if (response.getCode() != SdkError.SUCCESS.getNumber()) {
+                log.error(
+                        "AddSession request:{}, raw response:{}", bodyStr, response.getException());
+                return false;
+            }
+            log.debug(
+                    "AddSession request:{}, raw response:{}",
+                    bodyStr,
+                    JSONUtil.parseJson(response.getData()));
+            rootNode = JSONUtil.parseJson(response.getData());
         }
-        log.debug(
-                "AddSession request:{}, raw response:{}",
-                bodyStr,
-                JSONUtil.parseJson(response.getData()));
-
-        JsonNode rootNode = JSONUtil.parseJson(response.getData());
         JsonNode sessionIdNode = rootNode.path("data").path("session_id");
         return !sessionIdNode.isMissingNode() && !sessionIdNode.isNull();
     }
@@ -243,17 +272,29 @@ public class VikingMemoryWrapper extends BaseServiceImpl {
 
         String bodyStr = JSONUtil.toJson(body);
 
-        RawResponse response = json("SearchMemory", null, bodyStr);
-        if (response.getCode() != SdkError.SUCCESS.getNumber()) {
-            log.error("SearchMemory request:{}, raw response:{}", bodyStr, response.getException());
-            return Collections.emptyList();
+        JsonNode rootNode;
+        if (apiKeyClient != null) {
+            VikingApiKeyHttpClient.Response response =
+                    apiKeyClient.post("/api/memory/search", bodyStr);
+            rootNode = parseApiKeyResponse(response, "SearchMemory", collectionName);
+            if (rootNode == null) {
+                return Collections.emptyList();
+            }
+        } else {
+            RawResponse response = json("SearchMemory", null, bodyStr);
+            if (response.getCode() != SdkError.SUCCESS.getNumber()) {
+                log.error(
+                        "SearchMemory request:{}, raw response:{}",
+                        bodyStr,
+                        response.getException());
+                return Collections.emptyList();
+            }
+            log.debug(
+                    "SearchMemory request:{}, raw response:{}",
+                    bodyStr,
+                    JSONUtil.parseJson(response.getData()));
+            rootNode = JSONUtil.parseJson(response.getData());
         }
-        log.debug(
-                "SearchMemory request:{}, raw response:{}",
-                bodyStr,
-                JSONUtil.parseJson(response.getData()));
-
-        JsonNode rootNode = JSONUtil.parseJson(response.getData());
         JsonNode resultList = rootNode.path("data").path("result_list");
         List<MemoryEntry> memoryEntries = new ArrayList<>();
 
@@ -278,5 +319,38 @@ public class VikingMemoryWrapper extends BaseServiceImpl {
                                 .parts(Collections.singletonList(Part.builder().text(text).build()))
                                 .build())
                 .build();
+    }
+
+    private JsonNode parseApiKeyResponse(
+            VikingApiKeyHttpClient.Response response, String operation, String collectionName)
+            throws IOException {
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            log.error(
+                    "Viking API Key request failed: operation={}, collection={}, authMode=API_KEY,"
+                            + " status={}",
+                    operation,
+                    collectionName,
+                    response.statusCode());
+            return null;
+        }
+        JsonNode root = JSONUtil.parseJson(response.body());
+        JsonNode code = root.path("code");
+        JsonNode error = root.path("ResponseMetadata").path("Error");
+        if ((code.isNumber() && code.asInt() != 0) || (error.isObject() && !error.isEmpty())) {
+            log.error(
+                    "Viking API Key request failed: operation={}, collection={}, authMode=API_KEY,"
+                            + " status={}, code={}, requestId={}",
+                    operation,
+                    collectionName,
+                    response.statusCode(),
+                    code.isNumber() ? code.asText() : error.path("Code").asText("unknown"),
+                    root.path("request_id")
+                            .asText(
+                                    root.path("ResponseMetadata")
+                                            .path("RequestId")
+                                            .asText("unknown")));
+            return null;
+        }
+        return root;
     }
 }

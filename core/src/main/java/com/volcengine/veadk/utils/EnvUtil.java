@@ -26,6 +26,8 @@ public class EnvUtil {
     private static final String TLS_SERVICE_NAME = "OBSERVABILITY_OPENTELEMETRY_TLS_SERVICE_NAME";
     private static final String TLS_REGION = "OBSERVABILITY_OPENTELEMETRY_TLS_REGION";
     private static final String VIKINGMEM_MEMORY_TYPE = "DATABASE_VIKINGMEM_MEMORY_TYPE";
+    private static final String VIKING_API_KEY = "DATABASE_VIKING_API_KEY";
+    private static final String VIKINGMEM_API_KEY = "DATABASE_VIKINGMEM_API_KEY";
     private static final String MODEL_AGENT_API_KEY = "MODEL_AGENT_API_KEY";
     private static final String TOOL_CODE_SANDBOX_URL = "TOOL_CODE_SANDBOX_URL";
     private static final String AGENTKIT_TOOL_ID = "AGENTKIT_TOOL_ID";
@@ -97,6 +99,22 @@ public class EnvUtil {
             throw getIllegalStateException(VOLCENGINE_SECRET_KEY);
         }
         return secretKey;
+    }
+
+    public static String getOptionalAccessKey() {
+        return normalizeCredential(System.getenv(VOLCENGINE_ACCESS_KEY));
+    }
+
+    public static String getOptionalSecretKey() {
+        return normalizeCredential(System.getenv(VOLCENGINE_SECRET_KEY));
+    }
+
+    public static String resolveVikingApiKey(String explicitApiKey) {
+        return resolveCredential(explicitApiKey, VIKING_API_KEY);
+    }
+
+    public static String resolveVikingMemoryApiKey(String explicitApiKey) {
+        return resolveCredential(explicitApiKey, VIKINGMEM_API_KEY);
     }
 
     public static String getRegion() {
@@ -180,5 +198,22 @@ public class EnvUtil {
                 "Missing required configuration: "
                         + configName
                         + ". Please configure the environment variable before startup.");
+    }
+
+    private static String resolveCredential(String explicitValue, String environmentVariable) {
+        String normalized = normalizeCredential(explicitValue);
+        return normalized == null
+                ? normalizeCredential(System.getenv(environmentVariable))
+                : normalized;
+    }
+
+    private static String normalizeCredential(String value) {
+        if (StringUtils.isBlank(value)) {
+            return null;
+        }
+        String normalized = value.trim();
+        return "none".equalsIgnoreCase(normalized) || "null".equalsIgnoreCase(normalized)
+                ? null
+                : normalized;
     }
 }

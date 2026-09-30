@@ -92,6 +92,14 @@ export MODEL_AGENT_API_KEY="<your-ark-api-key>"
 - 如果需要使用web search、viking memory、viking knowledgebase，需要配置环境变化：
   - VOLCENGINE_ACCESS_KEY：火山引擎AccessKey
   - VOLCENGINE_SECRET_KEY：火山引擎SecretKey
+  - `DATABASE_VIKING_API_KEY`：查询已有 Viking KnowledgeBase collection 的 API Key
+  - `DATABASE_VIKINGMEM_API_KEY`：向已有 Viking Memory collection 添加或查询记忆的 API Key
+
+Viking 数据面操作支持通过 `KnowledgeBase.viking(appName, apiKey)`、
+`KnowledgeBase.Builder.apiKey(apiKey)` 或 `VikingMemoryService(appName, apiKey)` 显式传入 API Key，
+显式配置优先于对应环境变量；空白值及 `none`/`null` 会回退到环境变量，未配置有效 API Key 时继续使用
+AK/SK。仅配置 API Key 时须预先创建 collection，且不支持 collection 管理、KnowledgeBase `addDoc`、
+TOS 上传或文档管理，这些操作仍需 AK/SK。
 - 如果需要使用 Mem0 Memory，可以直接配置 Mem0 API Key：
   - `DATABASE_MEM0_API_KEY`：Mem0 API Key
   - `DATABASE_MEM0_BASE_URL`：Mem0 服务地址，例如 `https://api.mem0.ai`

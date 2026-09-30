@@ -3,6 +3,7 @@ package com.volcengine.veadk.knowledgebase;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.never;
 
 import com.volcengine.veadk.integration.vikingknowledgebase.VikingKnowledgebaseWrapper;
 import com.volcengine.veadk.knowledgebase.backends.BaseKnowledgebaseBackend;
@@ -103,11 +104,31 @@ class KnowledgeBaseTest {
                                 })) {
             mockedEnv.when(EnvUtil::getAccessKey).thenReturn("ak");
             mockedEnv.when(EnvUtil::getSecretKey).thenReturn("sk");
+            mockedEnv.when(EnvUtil::getOptionalAccessKey).thenReturn("ak");
+            mockedEnv.when(EnvUtil::getOptionalSecretKey).thenReturn("sk");
 
             KnowledgeBase knowledgeBase =
                     KnowledgeBase.builder().backend("viking").appName("KbApp").topK(4).build();
 
             assertEquals("viking answer", knowledgeBase.search("q").get(0).getContent());
+        }
+    }
+
+    @Test
+    void vikingShortcutPassesExplicitApiKey() {
+        try (MockedStatic<EnvUtil> mockedEnv = Mockito.mockStatic(EnvUtil.class);
+                MockedConstruction<VikingKnowledgebaseWrapper> mockedCtor =
+                        Mockito.mockConstruction(VikingKnowledgebaseWrapper.class)) {
+            mockedEnv
+                    .when(() -> EnvUtil.resolveVikingApiKey("explicit-key"))
+                    .thenReturn("explicit-key");
+
+            KnowledgeBase.viking("KbApp", "explicit-key");
+
+            mockedEnv.verify(() -> EnvUtil.resolveVikingApiKey("explicit-key"));
+            assertEquals(1, mockedCtor.constructed().size());
+            Mockito.verify(mockedCtor.constructed().get(0), never())
+                    .isCollectionExists(Mockito.anyString());
         }
     }
 

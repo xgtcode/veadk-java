@@ -29,6 +29,7 @@ public class VikingKnowledgebaseBackend implements BaseKnowledgebaseBackend {
     private final VikingKnowledgebaseWrapper wrapper;
     private final boolean rerank;
     private final int chunkDiffusionCount;
+    private final boolean hasCompleteAkSk;
 
     public VikingKnowledgebaseBackend(String collectionName) {
         this(validateCollectionName(collectionName), VikingKnowledgebaseConfig.fromEnv());
@@ -37,9 +38,11 @@ public class VikingKnowledgebaseBackend implements BaseKnowledgebaseBackend {
     public VikingKnowledgebaseBackend(String collectionName, VikingKnowledgebaseConfig config) {
         this(
                 validateCollectionName(collectionName),
-                new VikingKnowledgebaseWrapper(config.getAccessKey(), config.getSecretKey()),
+                new VikingKnowledgebaseWrapper(
+                        config.getAccessKey(), config.getSecretKey(), config.getApiKey()),
                 config.isRerank(),
-                config.getChunkDiffusionCount());
+                config.getChunkDiffusionCount(),
+                config.hasCompleteAkSk());
     }
 
     VikingKnowledgebaseBackend(
@@ -47,12 +50,24 @@ public class VikingKnowledgebaseBackend implements BaseKnowledgebaseBackend {
             VikingKnowledgebaseWrapper wrapper,
             boolean rerank,
             int chunkDiffusionCount) {
+        this(collectionName, wrapper, rerank, chunkDiffusionCount, true);
+    }
+
+    VikingKnowledgebaseBackend(
+            String collectionName,
+            VikingKnowledgebaseWrapper wrapper,
+            boolean rerank,
+            int chunkDiffusionCount,
+            boolean hasCompleteAkSk) {
         this.collectionName = collectionName;
         this.wrapper = wrapper;
         this.rerank = rerank;
         this.chunkDiffusionCount = chunkDiffusionCount;
+        this.hasCompleteAkSk = hasCompleteAkSk;
         precheckIndexNaming();
-        ensureCollection();
+        if (hasCompleteAkSk) {
+            ensureCollection();
+        }
     }
 
     @Override
@@ -62,6 +77,11 @@ public class VikingKnowledgebaseBackend implements BaseKnowledgebaseBackend {
 
     @Override
     public boolean addDoc(String tosUrl) {
+        if (!hasCompleteAkSk) {
+            throw new IllegalStateException(
+                    "Viking KnowledgeBase addDoc requires VOLCENGINE_ACCESS_KEY and"
+                            + " VOLCENGINE_SECRET_KEY.");
+        }
         return wrapper.addDoc(collectionName, tosUrl);
     }
 

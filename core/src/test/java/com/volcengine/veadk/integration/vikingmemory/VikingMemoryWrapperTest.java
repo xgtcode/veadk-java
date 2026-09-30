@@ -4,11 +4,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.volcengine.error.SdkError;
 import com.volcengine.model.response.RawResponse;
+import com.volcengine.veadk.integration.viking.VikingApiKeyHttpClient;
 import com.volcengine.veadk.utils.JSONUtil;
 import java.util.Arrays;
 import java.util.Collections;
@@ -167,5 +171,48 @@ class VikingMemoryWrapperTest {
                         2,
                         Collections.singletonList("sys_event_v1"));
         assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void apiKeyAddAndSearchUseDataPlanePaths() throws Exception {
+        VikingApiKeyHttpClient apiKeyClient = Mockito.mock(VikingApiKeyHttpClient.class);
+        when(apiKeyClient.post(eq("/api/memory/session/add"), anyString()))
+                .thenReturn(
+                        new VikingApiKeyHttpClient.Response(
+                                200, "{\"code\":0,\"data\":{\"session_id\":\"s1\"}}"));
+        when(apiKeyClient.post(eq("/api/memory/search"), anyString()))
+                .thenReturn(
+                        new VikingApiKeyHttpClient.Response(
+                                200,
+                                "{\"code\":0,\"data\":{\"result_list\":[{\"memory_info\":{\"summary\":\"remembered\"}}]}}"));
+        VikingMemoryWrapper wrapper = new VikingMemoryWrapper(null, null, apiKeyClient);
+
+        assertTrue(
+                wrapper.addSession(
+                        "MemoryApp",
+                        List.of(new Message("user", "hello")),
+                        new Metadata("u1", "a1", 1L)));
+        assertEquals(
+                1, wrapper.searchMemory("MemoryApp", "u1", "q", 5, List.of("sys_event_v1")).size());
+        verify(apiKeyClient).post(eq("/api/memory/session/add"), anyString());
+        verify(apiKeyClient).post(eq("/api/memory/search"), anyString());
+    }
+
+    @Test
+    void apiKeyBusinessErrorDoesNotFallbackToAkSk() throws Exception {
+        VikingApiKeyHttpClient apiKeyClient = Mockito.mock(VikingApiKeyHttpClient.class);
+        when(apiKeyClient.post(anyString(), anyString()))
+                .thenReturn(
+                        new VikingApiKeyHttpClient.Response(
+                                200, "{\"code\":1001,\"message\":\"denied\"}"));
+        VikingMemoryWrapper wrapper =
+                Mockito.spy(new VikingMemoryWrapper("ak", "sk", apiKeyClient));
+
+        assertFalse(
+                wrapper.addSession(
+                        "MemoryApp",
+                        List.of(new Message("user", "hello")),
+                        new Metadata("u1", "a1", 1L)));
+        verify(wrapper, never()).json(anyString(), isNull(), anyString());
     }
 }
